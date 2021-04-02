@@ -6,8 +6,9 @@
 #include<errno.h>
 #include<string.h>
 #include<stdlib.h>
+#include"icmp.h"
 
-
+// example.org: 93.184.216.34
 int main (int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "usage: %s <ip_addr>\n", argv[0]);
@@ -35,6 +36,11 @@ int main (int argc, char* argv[]) {
             fprintf(stderr, "inet_pton error: %s\n", strerror(errno));
         exit(1);
     }
+
+    int ttl = 64;
+    /* send ping request and receive reply */
+    send_icmp(sockfd, &address, &ttl, 1);
+    receive_icmp(sockfd, &address);
 
     return 0;
 }
