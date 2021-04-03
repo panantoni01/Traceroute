@@ -1,4 +1,5 @@
 #include"icmp.h"
+#include"wrappers.h"
 
 /* given an icmp header struct, computes its checksum; taken from lecture */
 uint16_t compute_icmp_checksum (const void *buff, int length){
@@ -28,43 +29,25 @@ void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int seq) {
     set_icmp_header(&header, seq);
 
     /* set appropiate ttl value */
-    if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, ttl, sizeof(int)) < 0) {
-        fprintf(stderr, "setsockopt error: %s\n", strerror(errno));
-        exit(1);
-    }
+    Setsockopt(sockfd, IPPROTO_IP, IP_TTL, ttl, sizeof(int));
 
     /* send icmp ping */
-    ssize_t bytes = sendto(
-        sockfd, 
-        &header, 
-        sizeof(header), 
-        0, 
-        (struct sockaddr*) address, 
-        sizeof(*address));
+    Sendto(sockfd, &header, sizeof(header), 0, 
+        (struct sockaddr*) address, sizeof(*address));
     
     char ip_addr[20]; 
-	inet_ntop(AF_INET, &(address->sin_addr), ip_addr, sizeof(ip_addr));
+	Inet_ntop(AF_INET, &(address->sin_addr), ip_addr, sizeof(ip_addr));
     printf("ICMP pack sent to: %s\n", ip_addr);
 
-    if (bytes < 0) {
-        fprintf(stderr, "sendto error: %s\n", strerror(errno));
-        exit(1);
-    }
 }
 
 void receive_icmp(int sockfd, struct sockaddr_in* address) {
     uint8_t buffer[IP_MAXPACKET];
     socklen_t address_len = sizeof(*address);
     
-    printf("Start recvfrom\n");
-    ssize_t packet_len = recvfrom(sockfd, buffer, IP_MAXPACKET, 0, (struct sockaddr*) address, &address_len);
-	if (packet_len < 0) {
-		fprintf(stderr, "recvfrom error: %s\n", strerror(errno)); 
-		exit(1);
-	}
-    printf("End recvfrom\n");
+	Recvfrom(sockfd, buffer, IP_MAXPACKET, 0, (struct sockaddr*) address, &address_len);
 
     char ip_str[20]; 
-	inet_ntop(AF_INET, &(address->sin_addr), ip_str, sizeof(ip_str));
+	Inet_ntop(AF_INET, &(address->sin_addr), ip_str, sizeof(ip_str));
 	printf("Received IP packet from: %s\n", ip_str);
 }
