@@ -17,7 +17,7 @@ void set_icmp_header(struct icmp* header, int seq) {
     header->icmp_hun.ih_idseq.icd_id = getpid();
     header->icmp_hun.ih_idseq.icd_seq = seq;
     header->icmp_cksum = 0;
-    header->icmp_cksum = compute_icmp_checksum((u_int16_t*)&header, sizeof(header));
+    header->icmp_cksum = compute_icmp_checksum((u_int16_t*)header, sizeof(*header));
 }
 
 

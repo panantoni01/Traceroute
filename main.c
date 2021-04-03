@@ -40,7 +40,9 @@ int main (int argc, char* argv[]) {
     int ttl = 64;
     /* send ping request and receive reply */
     send_icmp(sockfd, &address, &ttl, 1);
-    receive_icmp(sockfd, &address);
+    
+    struct sockaddr_in sender;
+    receive_icmp(sockfd, &sender);
 
     return 0;
 }
