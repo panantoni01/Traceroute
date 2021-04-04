@@ -30,8 +30,8 @@ int main (int argc, char* argv[]) {
     if ECHOREPLY was received, receive_icmp() returns 1 */
     int ttl = 1;
     while (ttl <= 30) {
-        send_icmp(sockfd, &address, &ttl, 1);
-        if (receive_icmp(sockfd, &ttl))
+        send_icmp(sockfd, &address, &ttl, 3);
+        if (receive_icmp(sockfd, &ttl, 3))
             break;
         ttl++;
     }

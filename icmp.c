@@ -57,9 +57,14 @@ static struct icmp* set_icmphdr_ptr (const void* buffer) {
     else if (icmp_header->icmp_type != ICMP_ECHOREPLY)
         return NULL;
     
+    /* return NULL if bad icmp type or pointer to:
+    * icmphdr if type is ICMP_ECHOREPLY
+    * inner icmphdr, that is in payload of icmp packet if type is ICMP_TIME_EXCEEDED */
     return icmp_header;
 }
 
+/* check if received icmp package is a response to some previously 
+sent icmp echo request (for given ttl) */
 static int is_good_response(const void* buffer, int ttl) {
     struct icmp* icmp_header = set_icmphdr_ptr(buffer);
     if (icmp_header == NULL)
@@ -70,11 +75,6 @@ static int is_good_response(const void* buffer, int ttl) {
 
     uint16_t my_id = getpid();
     uint16_t my_seq = ttl;
-    // printf("received id: %d\n", pack_id);
-    // printf("received seq: %d\n", pack_seq);
-
-    // printf("my id: %d\n", my_id);
-    // printf("my seq: %d\n", my_seq);
 
     if ((pack_id != my_id) || (pack_seq != my_seq) )
         return 0;
@@ -82,33 +82,38 @@ static int is_good_response(const void* buffer, int ttl) {
     return 1;
 }
 
+static int is_echoreply(const void* buffer){
+    struct ip* ip_header = (struct ip*) buffer;
+    uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
+    struct icmp* icmp_header = (struct icmp*) packet;
+    if (icmp_header->icmp_type == ICMP_ECHOREPLY)
+        return 1;
+    return 0;
+}
 
-int receive_icmp(int sockfd, int* ttl) {
-    /* 1. wait 1s for icmp packets; receive them using select() and recvfrom()
-       2. check if packets' icmp id and seq are ok (pid and ttl)
-       3. compute checksum and check if ok
-       4. print result depending on number of packs received:
-        * 0 - print *
-        * 1-2 - print router('s) ip('s) + '???' as we can't compute avg time
-        * 3 - print router('s) ip('s) and compute avg rtt time
-       5. if icmp_type was ECHO_REPLY - target was reached, so exit the program */
+static int await_single_pack(int sockfd, struct timeval* tv) {
+    fd_set descriptors;
+    FD_ZERO (&descriptors);
+    FD_SET (sockfd, &descriptors);
 
+    int ready = Select(sockfd + 1, &descriptors, NULL, NULL, tv);
+    if (ready == 0)
+        return 0;
+
+    return 1;
+}
+
+int receive_icmp(int sockfd, int* ttl, int n) {
     /* function returns 1 if received packs from the target computer were received, 0 otherwise */
     int end_flag = 0;
+    int good_packs = 0;
     
     printf("%d. ", *ttl);
     
-    // Ad 1
-    fd_set descriptors;
     struct timeval tv;
-    FD_ZERO (&descriptors);
-    FD_SET (sockfd, &descriptors);
     tv.tv_sec = 1; tv.tv_usec = 0;
-    int ready = Select(sockfd + 1, &descriptors, NULL, NULL, &tv);
- 
-    int good_packs = 0;
 
-    for (int i = 0; i < ready; i++) {
+    while (await_single_pack(sockfd, &tv)) {
         uint8_t buffer[IP_MAXPACKET];
         struct sockaddr_in sender;
         socklen_t sender_len = sizeof(sender);
@@ -116,22 +121,20 @@ int receive_icmp(int sockfd, int* ttl) {
         ssize_t packet_len = Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
             (struct sockaddr*)&sender, &sender_len);
 
-        // Ad 2 & 3
         if (!is_good_response(buffer, *ttl))
             continue;
         
         good_packs++;
 
-        struct ip* ip_header = (struct ip*) buffer;
-        uint8_t* packet = buffer + 4*ip_header->ip_hl;
-        struct icmp* icmp_header = (struct icmp*) packet;
-        if (icmp_header->icmp_type == ICMP_ECHOREPLY)
+        if (is_echoreply(buffer))
             end_flag = 1;
 
         char sender_ip_str[20]; 
 		Inet_ntop(AF_INET, &(sender.sin_addr), sender_ip_str, sizeof(sender_ip_str));
         printf("%s ", sender_ip_str);
 
+        if (good_packs == n)
+            break;
     }
     
     if (good_packs == 0)

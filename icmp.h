@@ -14,6 +14,6 @@
 
 
 void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int seq);
-int receive_icmp(int sockfd, int* ttl);
+int receive_icmp(int sockfd, int* ttl, int n);
 
 #endif /* !ICMP_H */
