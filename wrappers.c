@@ -63,3 +63,15 @@ ssize_t Recvfrom(int sockfd, void *buf, size_t len, int flags,
     }
     return bytes;
 }
+
+int Select(int nfds, fd_set *readfds, fd_set *writefds,
+                  fd_set *exceptfds, struct timeval *timeout) {
+    
+    int ret = select(nfds, readfds, writefds,
+                  exceptfds, timeout);
+    if (ret < 0) {
+        fprintf(stderr, "select error: %s\n", strerror(errno)); 
+		exit(1);
+    }
+    return ret;
+}

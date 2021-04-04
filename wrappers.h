@@ -18,5 +18,7 @@ const char* Inet_ntop(int af, const void *src,
                              char *dst, socklen_t size);
 ssize_t Recvfrom(int sockfd, void *buf, size_t len, int flags,
                         struct sockaddr *src_addr, socklen_t *addrlen);
+int Select(int nfds, fd_set *readfds, fd_set *writefds,
+                  fd_set *exceptfds, struct timeval *timeout);
 
 #endif /* !WRAPPERS_H */

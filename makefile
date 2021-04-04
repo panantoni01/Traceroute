@@ -12,7 +12,7 @@ icmp.o: icmp.c icmp.h
 wrappers.o: wrappers.c wrappers.h
 
 clean:
-	rm *.o
+	rm -f *.o
 
 distclean:
-	rm *.o $(PROGRAM)
+	rm -f *.o $(PROGRAM)

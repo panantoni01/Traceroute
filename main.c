@@ -20,18 +20,21 @@ int main (int argc, char* argv[]) {
     int sockfd;
     sockfd = Socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
-    /* create sockarr_in address structure */
+    /* create sockadrr_in address structure */
     struct sockaddr_in address;
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     Inet_pton(AF_INET, argv[1], &address.sin_addr);
     
-    int ttl = 64;
-    /* send ping request and receive reply */
-    send_icmp(sockfd, &address, &ttl, 1);
-    
-    struct sockaddr_in sender;
-    receive_icmp(sockfd, &sender);
+    /* for each ttl value send and receive 3 icmp packs;
+    if ECHOREPLY was received, receive_icmp() returns 1 */
+    int ttl = 1;
+    while (ttl <= 30) {
+        send_icmp(sockfd, &address, &ttl, 1);
+        if (receive_icmp(sockfd, &ttl))
+            break;
+        ttl++;
+    }
 
     return 0;
 }

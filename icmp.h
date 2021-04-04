@@ -13,9 +13,7 @@
 #include<string.h>
 
 
-uint16_t compute_icmp_checksum (const void* buff, int length);
-void set_icmp_header(struct icmp* header, int seq);
 void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int seq);
-void receive_icmp(int sockfd, struct sockaddr_in* address);
+int receive_icmp(int sockfd, int* ttl);
 
 #endif /* !ICMP_H */
