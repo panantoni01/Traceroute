@@ -17,7 +17,7 @@ int main (int argc, char* argv[]) {
         exit(1);
     }
 
-     /* create raw socket */
+    /* create raw socket */
     int sockfd;
     sockfd = Socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 

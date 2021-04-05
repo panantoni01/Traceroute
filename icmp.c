@@ -43,7 +43,7 @@ void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int n) {
 
 // ===========================================================
 
-/* helper function for checking a good response was received */
+/* helper function for checking if a good response was received */
 static struct icmp* set_icmphdr_ptr (const void* buffer) {
     struct ip* ip_header = (struct ip*) buffer;
     uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
@@ -57,7 +57,7 @@ static struct icmp* set_icmphdr_ptr (const void* buffer) {
     else if (icmp_header->icmp_type != ICMP_ECHOREPLY)
         return NULL;
     
-    /* return NULL if bad icmp type or pointer to:
+    /* returns NULL if bad icmp type or a pointer to:
     * icmphdr if type is ICMP_ECHOREPLY
     * inner icmphdr, that is in payload of icmp packet if type is ICMP_TIME_EXCEEDED */
     return icmp_header;
@@ -67,6 +67,7 @@ static struct icmp* set_icmphdr_ptr (const void* buffer) {
 sent icmp echo request (for given ttl) */
 static int is_good_response(const void* buffer, int ttl) {
     struct icmp* icmp_header = set_icmphdr_ptr(buffer);
+    
     if (icmp_header == NULL)
         return 0;
     
@@ -105,7 +106,6 @@ static int await_single_pack(int sockfd, struct timeval* tv) {
 }
 
 int receive_icmp(int sockfd, int* ttl, int n) {
-    /* function returns 1 if received packs from the target computer were received, 0 otherwise */
     int end_flag = 0;
     int good_packs = 0;
     double time_elapsed = 0;
@@ -115,8 +115,6 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     int ip_count = 0;
     for (int j = 0; j < n; j++)
         memset(ip_addrs[j], 0, 20);
-
-    printf("%d. ", *ttl);
     
     /* this structure will be processed in Select() syscall */
     struct timeval tv;
@@ -127,12 +125,13 @@ int receive_icmp(int sockfd, int* ttl, int n) {
         struct sockaddr_in sender;
         socklen_t sender_len = sizeof(sender);
 
-        ssize_t packet_len = Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
+        Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
             (struct sockaddr*)&sender, &sender_len);
 
         if (!is_good_response(buffer, *ttl))
             continue;
 
+        /* measure time spent on receiving this package */
         struct timeval tv_end;
         tv_end.tv_sec = 1; tv_end.tv_usec = 0;
         timersub(&tv_end, &tv, &tv_end);
@@ -164,6 +163,7 @@ int receive_icmp(int sockfd, int* ttl, int n) {
             break;
     }
     
+    printf("%d. ", *ttl);
     if (good_packs == 0)
         printf("*\n");
     else {
@@ -175,5 +175,7 @@ int receive_icmp(int sockfd, int* ttl, int n) {
             printf("%.3fms", (time_elapsed / 1000) / n);
         putchar('\n');
     }
+    
+    /* function returns 1 if packs from the "target" computer were received, 0 otherwise */
     return end_flag;
 }
