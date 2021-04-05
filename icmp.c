@@ -34,7 +34,7 @@ void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int n) {
     /* set appropiate ttl value */
     Setsockopt(sockfd, IPPROTO_IP, IP_TTL, ttl, sizeof(int));
 
-    /* send icmp pack */
+    /* send icmp packs */
     for (int i = 0; i < n; i++)
         Sendto(sockfd, &header, sizeof(header), 0, 
             (struct sockaddr*) address, sizeof(*address));  
@@ -107,6 +107,12 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     /* function returns 1 if received packs from the target computer were received, 0 otherwise */
     int end_flag = 0;
     int good_packs = 0;
+    /* arrays for distinct ip addresses, if they occur
+    (usually we print only 1 ip addr... but sometimes more!) */
+    char ip_addrs[n][20];
+    int ip_count = 0;
+    for (int j = 0; j < n; j++)
+        memset(ip_addrs[j], 0, 20);
     
     printf("%d. ", *ttl);
     
@@ -130,8 +136,18 @@ int receive_icmp(int sockfd, int* ttl, int n) {
             end_flag = 1;
 
         char sender_ip_str[20]; 
+        memset(sender_ip_str, 0, 20);
 		Inet_ntop(AF_INET, &(sender.sin_addr), sender_ip_str, sizeof(sender_ip_str));
-        printf("%s ", sender_ip_str);
+        int j = 0;
+        while (j < ip_count) {
+            if (!strncmp(ip_addrs[j], sender_ip_str, strnlen(sender_ip_str, 20)))
+                break;
+            j++;
+        }
+        if (j == ip_count) {
+            strncpy(ip_addrs[j], sender_ip_str , 20);
+            ip_count++;
+        }
 
         if (good_packs == n)
             break;
@@ -139,7 +155,12 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     
     if (good_packs == 0)
         printf("*\n");
-    else
+    else {
+        for (int j = 0; j < ip_count; j++)
+            printf("%s ",ip_addrs[j]);
+        if (good_packs < n)
+            printf("???");
         putchar('\n');
+    }
     return end_flag;
 }
