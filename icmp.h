@@ -11,6 +11,7 @@
 #include<unistd.h>
 #include<errno.h>
 #include<string.h>
+#include<sys/time.h>
 
 
 void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int seq);

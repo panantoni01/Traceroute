@@ -82,6 +82,7 @@ static int is_good_response(const void* buffer, int ttl) {
     return 1;
 }
 
+/* self - explanatory */
 static int is_echoreply(const void* buffer){
     struct ip* ip_header = (struct ip*) buffer;
     uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
@@ -107,15 +108,17 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     /* function returns 1 if received packs from the target computer were received, 0 otherwise */
     int end_flag = 0;
     int good_packs = 0;
+    double time_elapsed = 0;
     /* arrays for distinct ip addresses, if they occur
     (usually we print only 1 ip addr... but sometimes more!) */
     char ip_addrs[n][20];
     int ip_count = 0;
     for (int j = 0; j < n; j++)
         memset(ip_addrs[j], 0, 20);
-    
+
     printf("%d. ", *ttl);
     
+    /* this structure will be processed in Select() syscall */
     struct timeval tv;
     tv.tv_sec = 1; tv.tv_usec = 0;
 
@@ -129,12 +132,19 @@ int receive_icmp(int sockfd, int* ttl, int n) {
 
         if (!is_good_response(buffer, *ttl))
             continue;
-        
+
+        struct timeval tv_end;
+        tv_end.tv_sec = 1; tv_end.tv_usec = 0;
+        timersub(&tv_end, &tv, &tv_end);
+        time_elapsed += tv_end.tv_usec;
+
         good_packs++;
 
         if (is_echoreply(buffer))
             end_flag = 1;
 
+        /* if the sender ip address has already occurred, dont add it to ip_addrs[];
+        otherwise we need to add it, so that it will be printed later*/
         char sender_ip_str[20]; 
         memset(sender_ip_str, 0, 20);
 		Inet_ntop(AF_INET, &(sender.sin_addr), sender_ip_str, sizeof(sender_ip_str));
@@ -149,6 +159,7 @@ int receive_icmp(int sockfd, int* ttl, int n) {
             ip_count++;
         }
 
+        /* no need to continue if we've received all n packs */
         if (good_packs == n)
             break;
     }
@@ -160,6 +171,8 @@ int receive_icmp(int sockfd, int* ttl, int n) {
             printf("%s ",ip_addrs[j]);
         if (good_packs < n)
             printf("???");
+        else 
+            printf("%.3fms", (time_elapsed / 1000) / n);
         putchar('\n');
     }
     return end_flag;

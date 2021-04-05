@@ -75,3 +75,12 @@ int Select(int nfds, fd_set *readfds, fd_set *writefds,
     }
     return ret;
 }
+
+int Gettimeofday(struct timeval *tv, struct timezone *tz) {
+    int res = gettimeofday(tv,tz);
+    if (res < 0) {
+        fprintf(stderr, "gettimeofday error: %s\n", strerror(errno));
+        exit(1);
+    }
+    return res;
+}

@@ -6,6 +6,7 @@
 #include<errno.h>
 #include<string.h>
 #include<stdlib.h>
+#include<time.h>
 #include"icmp.h"
 #include"wrappers.h"
 
