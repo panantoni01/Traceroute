@@ -1,3 +1,7 @@
+// Antoni
+// Pokusiński
+// 314942
+
 #include"icmp.h"
 #include"wrappers.h"
 
