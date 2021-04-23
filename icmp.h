@@ -14,7 +14,7 @@
 #include<sys/time.h>
 
 
-void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int seq);
+void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int n);
 int receive_icmp(int sockfd, int* ttl, int n);
 
 #endif /* !ICMP_H */

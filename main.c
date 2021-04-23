@@ -27,11 +27,12 @@ int main (int argc, char* argv[]) {
     address.sin_family = AF_INET;
     Inet_pton(AF_INET, argv[1], &address.sin_addr);
     
-    /* for each ttl value send and receive 3 icmp packs;
+    const int n = 3;
+    /* for each ttl value send and receive n icmp packs;
     if ECHOREPLY was received, receive_icmp() returns 1 */
     for (int ttl = 1; ttl <= 30; ttl++) {
-        send_icmp(sockfd, &address, &ttl, 3);
-        if (receive_icmp(sockfd, &ttl, 3))
+        send_icmp(sockfd, &address, &ttl, n);
+        if (receive_icmp(sockfd, &ttl, n))
             break;
     }
 
