@@ -37,55 +37,31 @@ void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int n) {
     /* send icmp packs */
     for (int i = 0; i < n; i++)
         Sendto(sockfd, &header, sizeof(header), 0, 
-            (struct sockaddr*) address, sizeof(*address));  
-    
+            (struct sockaddr*) address, sizeof(*address));     
 }
 
 // ===========================================================
 
-/* helper function for checking if a good response was received */
-static struct icmp* set_icmphdr_ptr (const void* buffer) {
+/* check if received icmp package is a response to some previously 
+sent icmp echo request (for given ttl). 
+Returns -1 if id or seq is invalid, else returns type of the response*/
+static int is_good_response(const void* buffer, int ttl) {
     struct ip* ip_header = (struct ip*) buffer;
     uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
     struct icmp* icmp_header = (struct icmp*) packet;
+    uint8_t type = icmp_header->icmp_type;
     
-    if (icmp_header->icmp_type == ICMP_TIME_EXCEEDED) {
-        struct ip* ip_header_inner = (struct ip*)((uint8_t*)icmp_header + sizeof(struct icmphdr));
-        uint8_t* packet_inner = (uint8_t*)ip_header_inner + 4*ip_header_inner->ip_hl;
-        icmp_header = (struct icmp*)packet_inner;
+    if (type == ICMP_TIME_EXCEEDED) {
+        struct ip* inner_ip_header = &(icmp_header->icmp_dun.id_ip.idi_ip);
+        uint8_t* inner_packet = (uint8_t*)inner_ip_header + 4*inner_ip_header->ip_hl;
+        icmp_header = (struct icmp*) inner_packet;
     }
-    else if (icmp_header->icmp_type != ICMP_ECHOREPLY)
-        return NULL;
-    
-    /* returns NULL if bad icmp type or a pointer to:
-    * icmphdr if type is ICMP_ECHOREPLY
-    * inner icmphdr, that is in payload of icmp packet if type is ICMP_TIME_EXCEEDED */
-    return icmp_header;
-}
-
-/* check if received icmp package is a response to some previously 
-sent icmp echo request (for given ttl) */
-static int is_good_response(const void* buffer, int ttl) {
-    struct icmp* icmp_header = set_icmphdr_ptr(buffer);
-    
-    if (icmp_header == NULL)
-        return 0;
 
     if ((ntohs(icmp_header->icmp_hun.ih_idseq.icd_id) != getpid()) || 
         (ntohs(icmp_header->icmp_hun.ih_idseq.icd_seq) != ttl))
-        return 0;
+        return -1;
     
-    return 1;
-}
-
-/* self - explanatory */
-static int is_echoreply(const void* buffer){
-    struct ip* ip_header = (struct ip*) buffer;
-    uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
-    struct icmp* icmp_header = (struct icmp*) packet;
-    if (icmp_header->icmp_type == ICMP_ECHOREPLY)
-        return 1;
-    return 0;
+    return (int)type;
 }
 
 static int await_single_pack(int sockfd, struct timeval* tv) {
@@ -105,7 +81,6 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     in_addr_t ip_addrs[n];
     int ip_count = 0;
     
-    /* this structure will be processed in Select() syscall */
     struct timeval tv;
     tv.tv_sec = 1; tv.tv_usec = 0;
 
@@ -117,19 +92,20 @@ int receive_icmp(int sockfd, int* ttl, int n) {
         Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
             (struct sockaddr*)&sender, &sender_len);
 
-        if (!is_good_response(buffer, *ttl))
+        int is_good = is_good_response(buffer, *ttl);
+        if ((is_good < 0) || ((is_good != ICMP_ECHOREPLY) && (is_good != ICMP_TIME_EXCEEDED)))
             continue;
 
+        if (is_good == ICMP_ECHOREPLY)
+            end_flag = 1;
+        
+        good_packs++;
+        
         /* measure time spent on receiving this package */
         struct timeval tv_end;
         tv_end.tv_sec = 1; tv_end.tv_usec = 0;
         timersub(&tv_end, &tv, &tv_end);
         time_elapsed += tv_end.tv_usec;
-
-        good_packs++;
-
-        if (is_echoreply(buffer))
-            end_flag = 1;
 
         /* if the sender ip address has already occurred, dont add it to ip_addrs[];
         otherwise we need to add it, so that it will be printed later*/
