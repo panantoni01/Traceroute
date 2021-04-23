@@ -1,7 +1,3 @@
-// Antoni
-// Pokusiński
-// 314942
-
 #include<stdio.h>
 #include<arpa/inet.h>
 #include<netinet/in.h>
@@ -33,12 +29,10 @@ int main (int argc, char* argv[]) {
     
     /* for each ttl value send and receive 3 icmp packs;
     if ECHOREPLY was received, receive_icmp() returns 1 */
-    int ttl = 1;
-    while (ttl <= 30) {
+    for (int ttl = 1; ttl <= 30; ttl++) {
         send_icmp(sockfd, &address, &ttl, 3);
         if (receive_icmp(sockfd, &ttl, 3))
             break;
-        ttl++;
     }
 
     return 0;

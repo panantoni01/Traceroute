@@ -1,7 +1,3 @@
-// Antoni
-// Pokusiński
-// 314942
-
 #include"wrappers.h"
 
 int Socket(int domain, int type, int protocol) {
@@ -78,13 +74,4 @@ int Select(int nfds, fd_set *readfds, fd_set *writefds,
 		exit(1);
     }
     return ret;
-}
-
-int Gettimeofday(struct timeval *tv, struct timezone *tz) {
-    int res = gettimeofday(tv,tz);
-    if (res < 0) {
-        fprintf(stderr, "gettimeofday error: %s\n", strerror(errno));
-        exit(1);
-    }
-    return res;
 }

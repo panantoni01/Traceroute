@@ -1,7 +1,3 @@
-// Antoni
-// Pokusiński
-// 314942
-
 #include"icmp.h"
 #include"wrappers.h"
 
@@ -21,9 +17,9 @@ static void set_icmp_header(struct icmp* header, int ttl) {
     header->icmp_type = ICMP_ECHO;
     header->icmp_code = 0;
     /* we want to receive icmp packs only for this instance of traceroute: */
-    header->icmp_hun.ih_idseq.icd_id = getpid();
+    header->icmp_hun.ih_idseq.icd_id = htons(getpid());
     
-    header->icmp_hun.ih_idseq.icd_seq = ttl;
+    header->icmp_hun.ih_idseq.icd_seq = htons(ttl);
     header->icmp_cksum = 0;
     header->icmp_cksum = compute_icmp_checksum((u_int16_t*)header, sizeof(*header));
 }
@@ -74,14 +70,9 @@ static int is_good_response(const void* buffer, int ttl) {
     
     if (icmp_header == NULL)
         return 0;
-    
-    uint16_t pack_id = icmp_header->icmp_hun.ih_idseq.icd_id;
-    uint16_t pack_seq = icmp_header->icmp_hun.ih_idseq.icd_seq;
 
-    uint16_t my_id = getpid();
-    uint16_t my_seq = ttl;
-
-    if ((pack_id != my_id) || (pack_seq != my_seq) )
+    if ((ntohs(icmp_header->icmp_hun.ih_idseq.icd_id) != getpid()) || 
+        (ntohs(icmp_header->icmp_hun.ih_idseq.icd_seq) != ttl))
         return 0;
     
     return 1;
@@ -102,12 +93,8 @@ static int await_single_pack(int sockfd, struct timeval* tv) {
     FD_ZERO (&descriptors);
     FD_SET (sockfd, &descriptors);
 
-    int ready = Select(sockfd + 1, &descriptors, NULL, NULL, tv);
-    if (ready == 0)
-        return 0;
-
-    return 1;
-}
+    return Select(sockfd + 1, &descriptors, NULL, NULL, tv);
+}  
 
 int receive_icmp(int sockfd, int* ttl, int n) {
     int end_flag = 0;
@@ -115,16 +102,14 @@ int receive_icmp(int sockfd, int* ttl, int n) {
     double time_elapsed = 0;
     /* arrays for distinct ip addresses, if they occur
     (usually we print only 1 ip addr... but sometimes more!) */
-    char ip_addrs[n][20];
+    in_addr_t ip_addrs[n];
     int ip_count = 0;
-    for (int j = 0; j < n; j++)
-        memset(ip_addrs[j], 0, 20);
     
     /* this structure will be processed in Select() syscall */
     struct timeval tv;
     tv.tv_sec = 1; tv.tv_usec = 0;
 
-    while (await_single_pack(sockfd, &tv)) {
+    while ((good_packs < n) && await_single_pack(sockfd, &tv)) {
         uint8_t buffer[IP_MAXPACKET];
         struct sockaddr_in sender;
         socklen_t sender_len = sizeof(sender);
@@ -148,31 +133,27 @@ int receive_icmp(int sockfd, int* ttl, int n) {
 
         /* if the sender ip address has already occurred, dont add it to ip_addrs[];
         otherwise we need to add it, so that it will be printed later*/
-        char sender_ip_str[20]; 
-        memset(sender_ip_str, 0, 20);
-		Inet_ntop(AF_INET, &(sender.sin_addr), sender_ip_str, sizeof(sender_ip_str));
         int j = 0;
         while (j < ip_count) {
-            if (!strncmp(ip_addrs[j], sender_ip_str, strnlen(sender_ip_str, 20)))
+            if (sender.sin_addr.s_addr == ip_addrs[j])
                 break;
             j++;
         }
         if (j == ip_count) {
-            strncpy(ip_addrs[j], sender_ip_str , 20);
+            ip_addrs[j] = sender.sin_addr.s_addr;
             ip_count++;
         }
-
-        /* no need to continue if we've received all n packs */
-        if (good_packs == n)
-            break;
     }
     
     printf("%d. ", *ttl);
     if (good_packs == 0)
         printf("*\n");
     else {
-        for (int j = 0; j < ip_count; j++)
-            printf("%s ",ip_addrs[j]);
+        for (int j = 0; j < ip_count; j++) {
+            char printable_addr[20] = {'\0'};
+            Inet_ntop(AF_INET, ip_addrs + j, printable_addr, sizeof(printable_addr));
+            printf("%s ", printable_addr);
+        }
         if (good_packs < n)
             printf("???");
         else 
