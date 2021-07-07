@@ -43,10 +43,11 @@ int main (int argc, char* argv[]) {
         }
     }
 
-    if (optind >= argc) 
-        perror("Expected argument after options\n");
+    if (optind >= argc) {
+        fprintf(stderr, "Expected argument after options\n");
+        exit(EXIT_FAILURE);
+    }
     
-
     /* create raw socket */
     int sockfd = Socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
@@ -60,7 +61,7 @@ int main (int argc, char* argv[]) {
     if ECHOREPLY was received, receive_icmp() returns 1 */
     for (int ttl = first_ttl; ttl <= max_ttl; ttl++) {
         send_icmp(sockfd, &address, &ttl, nqueries);
-        if (receive_icmp(sockfd, &ttl, nqueries))
+        if (receive_icmp(sockfd, &ttl, nqueries, map_IP_addr))
             break;
     }
 

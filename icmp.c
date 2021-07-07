@@ -73,7 +73,7 @@ static int await_single_pack(int sockfd, struct timeval* tv) {
     return Select(sockfd + 1, &descriptors, NULL, NULL, tv);
 }  
 
-int receive_icmp(int sockfd, int* ttl, int n) {
+int receive_icmp(int sockfd, int* ttl, int n, int map_IP_addr) {
     int end_flag = 0;
     int good_packs = 0;
     double time_elapsed = 0;
@@ -129,7 +129,18 @@ int receive_icmp(int sockfd, int* ttl, int n) {
         for (int j = 0; j < ip_count; j++) {
             char printable_addr[20] = {'\0'};
             Inet_ntop(AF_INET, ip_addrs + j, printable_addr, sizeof(printable_addr));
-            printf("%s ", printable_addr);
+            if (map_IP_addr) { /* need to translate IPv4 address to a human-readable name */
+                struct addrinfo* res;
+                char hostname[NI_MAXHOST];
+                Getaddrinfo(printable_addr, NULL, NULL, &res);
+                int ret = Getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0, 0);
+                if (*hostname != '\0' && ret == 0)
+                    printf("%s ", hostname);
+                else
+                    printf("%s ", printable_addr);
+            }
+            else 
+                printf("%s ", printable_addr);
         }
         if (good_packs < n)
             printf("???");
