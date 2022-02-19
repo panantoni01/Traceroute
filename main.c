@@ -14,14 +14,14 @@
 // example.org: 93.184.216.34
 int main (int argc, char* argv[]) {
     int first_ttl = 1, max_ttl = 30;
-    int map_IP_addr = 1;
-    int nqueries = 3;
+    int use_dns = 1;
+    int n = 3;
 
     int opt;
     while ((opt = getopt(argc, argv, "f:m:nq:")) != -1) {
         switch (opt) {
             case 'n':
-                map_IP_addr = 0;
+                use_dns = 0;
                 break;
             case 'f':
                 first_ttl = atoi(optarg);
@@ -30,14 +30,14 @@ int main (int argc, char* argv[]) {
                 max_ttl = atoi(optarg);
                 break;
             case 'q':
-                nqueries = atoi(optarg);
-                if (nqueries <= 0) {
+                n = atoi(optarg);
+                if (n <= 0) {
                     fprintf(stderr, "Invalid argument for option -q\n");
                     exit(EXIT_FAILURE);
                 }
                 break;
             default:
-                fprintf(stderr, "Usage: %s [-f first_ttl] [-m max_ttl] [-n] [-q nqueries] ip_addr\n",
+                fprintf(stderr, "Usage: %s [-f first_ttl] [-m max_ttl] [-n] [-q num_packs] ip_addr\n",
                            argv[0]);
                 exit(EXIT_FAILURE);
         }
@@ -57,11 +57,10 @@ int main (int argc, char* argv[]) {
     address.sin_family = AF_INET;
     Inet_pton(AF_INET, argv[optind], &address.sin_addr);
     
-    /* for each ttl value send and receive n icmp packs;
-    if ECHOREPLY was received, receive_icmp() returns 1 */
+    /* for each ttl value send and receive `n` icmp packs */
     for (int ttl = first_ttl; ttl <= max_ttl; ttl++) {
-        send_icmp(sockfd, &address, &ttl, nqueries);
-        if (receive_icmp(sockfd, &ttl, nqueries, map_IP_addr))
+        send_icmp(sockfd, &address, ttl, n);
+        if (receive_icmp(sockfd, ttl, n, use_dns))
             break;
     }
 

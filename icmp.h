@@ -16,7 +16,7 @@
 
 #define   NI_MAXHOST 1025
 
-void send_icmp (int sockfd, struct sockaddr_in* address, int* ttl, int n);
-int receive_icmp(int sockfd, int* ttl, int n, int map_IP_addr);
+void send_icmp (int sockfd, struct sockaddr_in* address, int ttl, int n);
+int receive_icmp(int sockfd, int ttl, int n, int map_IP_addr);
 
 #endif /* !ICMP_H */

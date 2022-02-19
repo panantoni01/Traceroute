@@ -16,7 +16,6 @@ static uint16_t compute_icmp_checksum (const void *buff, int length){
 static void set_icmp_header(struct icmp* header, int seq) {
     header->icmp_type = ICMP_ECHO;
     header->icmp_code = 0;
-    /* we want to receive icmp packs only for this instance of traceroute: */
     header->icmp_hun.ih_idseq.icd_id = htons(getpid());
     header->icmp_hun.ih_idseq.icd_seq = htons(seq);
     header->icmp_cksum = 0;
@@ -25,15 +24,14 @@ static void set_icmp_header(struct icmp* header, int seq) {
 
 
 /* send n icmp packs to given address with given ttl */
-void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int n) {
-    /* set appropiate ttl value */
-    Setsockopt(sockfd, IPPROTO_IP, IP_TTL, ttl, sizeof(int));
+void send_icmp(int sockfd, struct sockaddr_in* address, int ttl, int n) {
+    Setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
 
     /* send icmp packs */
     for (int i = 0; i < n; i++) {
         struct icmp header;
-        set_icmp_header(&header, n*(*ttl-1) + i + 1);
-
+        set_icmp_header(&header, n*(ttl-1) + i + 1);
+        
         Sendto(sockfd, &header, sizeof(header), 0, 
             (struct sockaddr*) address, sizeof(*address));    
     } 
@@ -43,8 +41,8 @@ void send_icmp(int sockfd, struct sockaddr_in* address, int* ttl, int n) {
 
 /* check if received icmp package is a response to some previously 
 sent icmp echo request (for given ttl). 
-Returns -1 if id or seq is invalid, else returns type of the response*/
-static int is_good_response(const void* buffer, int ttl, int n) {
+Returns -1 if id or seq is invalid, else returns icmp type */
+static int get_icmp_type(const void* buffer, int ttl, int n) {
     struct ip* ip_header = (struct ip*) buffer;
     uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
     struct icmp* icmp_header = (struct icmp*) packet;
@@ -73,18 +71,16 @@ static int await_single_pack(int sockfd, struct timeval* tv) {
     return Select(sockfd + 1, &descriptors, NULL, NULL, tv);
 }  
 
-int receive_icmp(int sockfd, int* ttl, int n, int map_IP_addr) {
-    int end_flag = 0;
-    int good_packs = 0;
-    double time_elapsed = 0;
-    /* arrays for distinct ip addresses, if they occur
-    (usually we print only 1 ip addr... but sometimes more!) */
+/* if ECHOREPLY was received - returns 1, else 0 */
+int receive_icmp(int sockfd, int ttl, int n, int use_dns) {
     in_addr_t ip_addrs[n];
     int ip_count = 0;
+    int target_reached = 0;
+    int good_packs = 0;
+    double time_elapsed = 0;
+    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
     
-    struct timeval tv;
-    tv.tv_sec = 1; tv.tv_usec = 0;
-
+    /* receive packets unless all `n` received or the time is up */
     while ((good_packs < n) && await_single_pack(sockfd, &tv)) {
         uint8_t buffer[IP_MAXPACKET];
         struct sockaddr_in sender;
@@ -93,62 +89,60 @@ int receive_icmp(int sockfd, int* ttl, int n, int map_IP_addr) {
         Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
             (struct sockaddr*)&sender, &sender_len);
 
-        int is_good = is_good_response(buffer, *ttl, n);
-        if ((is_good < 0) || ((is_good != ICMP_ECHOREPLY) && (is_good != ICMP_TIME_EXCEEDED)))
+        int icmp_type = get_icmp_type(buffer, ttl, n);
+        if (icmp_type < 0 || ((icmp_type != ICMP_ECHOREPLY) && (icmp_type != ICMP_TIME_EXCEEDED)))
             continue;
-
-        if (is_good == ICMP_ECHOREPLY)
-            end_flag = 1;
+        if (icmp_type == ICMP_ECHOREPLY)
+            target_reached = 1;
         
         good_packs++;
         
         /* measure time spent on receiving this package */
-        struct timeval tv_end;
-        tv_end.tv_sec = 1; tv_end.tv_usec = 0;
+        struct timeval tv_end = { .tv_sec = 1, .tv_usec = 0 };
         timersub(&tv_end, &tv, &tv_end);
         time_elapsed += tv_end.tv_usec;
 
         /* if the sender ip address has already occurred, dont add it to ip_addrs[];
-        otherwise we need to add it, so that it will be printed later*/
-        int j = 0;
-        while (j < ip_count) {
+        otherwise we need to add it, so that we can print it later */
+        int j;
+        for (j = 0; j < ip_count; j++) 
             if (sender.sin_addr.s_addr == ip_addrs[j])
                 break;
-            j++;
-        }
         if (j == ip_count) {
             ip_addrs[j] = sender.sin_addr.s_addr;
             ip_count++;
         }
     }
     
-    printf("%d. ", *ttl);
-    if (good_packs == 0)
+    printf("%d. ", ttl);
+    
+    /* no packets received, therefore nothing to print */
+    if (good_packs == 0) {
         printf("*\n");
-    else {
-        for (int j = 0; j < ip_count; j++) {
-            char printable_addr[20] = {'\0'};
-            Inet_ntop(AF_INET, ip_addrs + j, printable_addr, sizeof(printable_addr));
-            if (map_IP_addr) { /* need to translate IPv4 address to a human-readable name */
-                struct addrinfo* res;
-                char hostname[NI_MAXHOST];
-                Getaddrinfo(printable_addr, NULL, NULL, &res);
-                int ret = Getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0, 0);
-                if (*hostname != '\0' && ret == 0)
-                    printf("%s ", hostname);
-                else
-                    printf("%s ", printable_addr);
-            }
-            else 
-                printf("%s ", printable_addr);
-        }
-        if (good_packs < n)
-            printf("???");
-        else 
-            printf("%.3fms", (time_elapsed / 1000) / n);
-        putchar('\n');
+        return target_reached;
     }
     
-    /* function returns 1 if packs from the "target" computer were received, 0 otherwise */
-    return end_flag;
+    /* print every ip_addr, that responded to the ping request*/
+    for (int j = 0; j < ip_count; j++) {
+        char printable_addr[20] = {'\0'};
+        Inet_ntop(AF_INET, ip_addrs + j, printable_addr, sizeof(printable_addr));
+        
+        if (use_dns) { /* translate IPv4 address to a human-readable name */
+            struct addrinfo* res;
+            char hostname[NI_MAXHOST];
+            Getaddrinfo(printable_addr, NULL, NULL, &res);
+            int ret = Getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0, 0);
+            printf("%s ",((*hostname != '\0' && ret == 0) ? hostname : printable_addr));
+        }
+        else 
+            printf("%s ", printable_addr);
+    }
+    /* if all the responses were received, print avg response time */
+    if (good_packs == n)
+        printf("%.3fms", (time_elapsed / 1000) / n);
+    else 
+        printf("???");
+    putchar('\n');
+
+    return target_reached;
 }
