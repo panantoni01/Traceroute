@@ -90,14 +90,14 @@ int receive_icmp(int sockfd, int ttl, int n, int use_dns) {
             (struct sockaddr*)&sender, &sender_len);
 
         int icmp_type = get_icmp_type(buffer, ttl, n);
-        if (icmp_type < 0 || ((icmp_type != ICMP_ECHOREPLY) && (icmp_type != ICMP_TIME_EXCEEDED)))
-            continue;
         if (icmp_type == ICMP_ECHOREPLY)
             target_reached = 1;
+        else if (icmp_type != ICMP_TIME_EXCEEDED)
+            continue;
         
         good_packs++;
         
-        /* measure time spent on receiving this package */
+        /* calculate time spent on receiving this package */
         struct timeval tv_end = { .tv_sec = 1, .tv_usec = 0 };
         timersub(&tv_end, &tv, &tv_end);
         time_elapsed += tv_end.tv_usec;
