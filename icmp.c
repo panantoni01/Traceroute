@@ -92,7 +92,7 @@ int receive_icmp(int sockfd, int ttl, int n, int use_dns) {
         int icmp_type = get_icmp_type(buffer, ttl, n);
         if (icmp_type == ICMP_ECHOREPLY)
             target_reached = 1;
-        if (icmp_type != ICMP_TIME_EXCEEDED)
+        else if (icmp_type != ICMP_TIME_EXCEEDED)
             continue;
         
         good_packs++;
