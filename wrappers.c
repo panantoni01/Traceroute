@@ -75,27 +75,3 @@ int Select(int nfds, fd_set *readfds, fd_set *writefds,
     }
     return ret;
 }
-
-int Getaddrinfo(const char *restrict node, const char *restrict service,
-                const struct addrinfo *restrict hints, struct addrinfo **restrict res) {
-    
-    int ret = getaddrinfo(node, service, hints, res);            
-    if (ret != 0) {
-        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(ret));
-        exit(1);
-    }
-    return ret;                      
-}
-
-int Getnameinfo(const struct sockaddr *restrict addr, socklen_t addrlen,
-                       char *restrict host, socklen_t hostlen,
-                       char *restrict serv, socklen_t servlen, int flags) {
-    int ret = getnameinfo(addr, addrlen, 
-                            host, hostlen, 
-                            serv, servlen, flags);
-    if (ret != 0 && ret != EAI_AGAIN) {
-        fprintf(stderr, "getnameinfo error: %s\n", gai_strerror(ret));
-        exit(1);
-    }
-    return ret;   
-}
