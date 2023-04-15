@@ -104,6 +104,8 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
             return;
         }
 
+        gettimeofday(&response->rec_time, NULL);
+
         res = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len);
         if (res < 0)
@@ -120,11 +122,13 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     response->rec_addr = sender.sin_addr;
 }
 
-void get_report(receive_t* responses, int num_packs, char* buffer) {
+void get_report(struct timeval* send_time, receive_t* responses, int num_packs, char* buffer) {
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_packs];
-    char ip_addr_buf[INET_ADDRSTRLEN];
+    char ip_addr_buf[INET_ADDRSTRLEN], elapsed_buf[512] = {0};
     const char space = ' ';
+    long elapsed_us = 0;
+    struct timeval tv;
 
     if (responses[0].rec_status == STATUS_TIMEOUT) {
         buffer[0] = '*';
@@ -150,6 +154,20 @@ void get_report(receive_t* responses, int num_packs, char* buffer) {
         strncat(buffer, ip_addr_buf, INET_ADDRSTRLEN);
         strncat(buffer, &space, 1);
     }
+
+
+    for (i = 0; i < num_packs; i++) {
+        if (responses[i].rec_status != STATUS_ECHOREPLY &&
+            responses[i].rec_status != STATUS_TTL_EXCEEDED) {
+            strcat(buffer, "???");
+            return; 
+        }
+
+        timersub(&responses[i].rec_time, send_time, &tv);
+        elapsed_us += tv.tv_usec + 1e6*tv.tv_sec;
+    } 
+    snprintf(elapsed_buf, sizeof(elapsed_buf), "%.3fms", (double)elapsed_us / 1000 / num_packs);
+    strncat(buffer, elapsed_buf, strlen(elapsed_buf));
 }
 
 int destination_reached(receive_t* responses, int num_packs) {

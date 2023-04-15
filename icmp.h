@@ -19,7 +19,7 @@ typedef struct receive {
 
 void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq);
 void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response);
-void get_report(receive_t* responses, int num_packs, char* buffer);
+void get_report(struct timeval* send_time, receive_t* responses, int num_packs, char* buffer);
 int destination_reached(receive_t* responses, int num_packs);
 
 #endif /* !ICMP_H */

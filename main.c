@@ -18,6 +18,7 @@ int main (int argc, char* argv[]) {
     struct sockaddr_in address;
     static int seq = 0;
     char* report;
+    const int report_size = num_packs * (INET_ADDRSTRLEN+1) + 512;
     struct timeval tv;
     
     while ((opt = getopt(argc, argv, "f:m:q:")) != -1) {
@@ -72,8 +73,9 @@ int main (int argc, char* argv[]) {
                 break;
         }
 
-        report = calloc(num_packs, (INET_ADDRSTRLEN+1));
-        get_report(responses, num_packs, report);
+        report = malloc(report_size);
+        memset(report, 0, report_size);
+        get_report(&tv, responses, num_packs, report);
         printf("%d. %s\n", ttl, report);
         free(report);
 
