@@ -121,7 +121,7 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
 }
 
 void get_report(receive_t* responses, int num_packs, char* buffer) {
-    int i, j, num_addrs = 0, result_idx = 0;
+    int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_packs];
     char ip_addr_buf[INET_ADDRSTRLEN];
     const char space = ' ';
