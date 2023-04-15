@@ -65,14 +65,15 @@ int main (int argc, char* argv[]) {
             send_icmp_echo(sockfd, &address, ttl, seq++);
         
         receive_t responses[num_packs];
-        memset(responses, 0, sizeof(receive_t) * num_packs);
+        memset(responses, 0, num_packs * sizeof(receive_t));
         for (i = 0; i < num_packs; i++) {
             receive_icmp(sockfd, seq - num_packs, seq - 1, &responses[i]);
             if (responses[i].rec_status == STATUS_TIMEOUT)
                 break;
         }
 
-        report = get_report(responses, num_packs);
+        report = calloc(num_packs, (INET_ADDRSTRLEN+1));
+        get_report(responses, num_packs, report);
         printf("%d. %s\n", ttl, report);
         free(report);
 

@@ -120,19 +120,15 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     response->rec_addr = sender.sin_addr;
 }
 
-char* get_report(receive_t* responses, int num_packs) {
+void get_report(receive_t* responses, int num_packs, char* buffer) {
     int i, j, num_addrs = 0, result_idx = 0;
     struct in_addr distinct_addrs[num_packs];
     char ip_addr_buf[INET_ADDRSTRLEN];
-    const int result_size = num_packs * (INET_ADDRSTRLEN+1);
-    char* result = malloc(result_size);
     const char space = ' ';
-    
-    memset(result, 0, result_size);
 
     if (responses[0].rec_status == STATUS_TIMEOUT) {
-        result[0] = '*';
-        return result;
+        buffer[0] = '*';
+        return;
     }
 
     /* find distinct IP addresses */
@@ -151,11 +147,9 @@ char* get_report(receive_t* responses, int num_packs) {
 
     for (i = 0; i < num_addrs; i++) {
         Inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN);
-        strncat(result, ip_addr_buf, INET_ADDRSTRLEN);
-        strncat(result, &space, 1);
+        strncat(buffer, ip_addr_buf, INET_ADDRSTRLEN);
+        strncat(buffer, &space, 1);
     }
-
-    return result;
 }
 
 int destination_reached(receive_t* responses, int num_packs) {
