@@ -1,0 +1,5 @@
+traceroute
+*.o
+*.d
+.vscode/*
+.gdb_history
