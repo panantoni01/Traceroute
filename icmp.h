@@ -1,22 +1,25 @@
 #ifndef ICMP_H
 #define ICMP_H
 
-#include<stdint.h>
-#include<stdio.h>
-#include<assert.h>
-#include<stdlib.h>
-#include<netinet/ip.h>
-#include<netinet/ip_icmp.h>
-#include<arpa/inet.h>
-#include<unistd.h>
-#include<errno.h>
-#include<string.h>
-#include<sys/time.h>
-#include<netdb.h>
+#include <arpa/inet.h>
+#include <sys/time.h>
 
-#define   NI_MAXHOST 1025
+typedef enum {
+    STATUS_TTL_EXCEEDED = 1,
+    STATUS_ECHOREPLY = 2,
+    STATUS_TIMEOUT = 3
+} icmp_status_t;
 
-void send_icmp (int sockfd, struct sockaddr_in* address, int ttl, int n);
-int receive_icmp(int sockfd, int ttl, int n, int map_IP_addr);
+typedef struct receive {
+    icmp_status_t rec_status;
+    struct in_addr rec_addr;
+    struct timeval rec_time;
+} receive_t;
+
+
+void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq);
+void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response);
+char* get_report(receive_t* responses, int num_packs);
+int destination_reached(receive_t* responses, int num_packs);
 
 #endif /* !ICMP_H */

@@ -1,7 +1,20 @@
+#include<stdint.h>
+#include<stdio.h>
+#include<assert.h>
+#include<stdlib.h>
+#include<netinet/ip.h>
+#include<netinet/ip_icmp.h>
+#include<arpa/inet.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<sys/time.h>
+#include<netdb.h>
+
 #include"icmp.h"
 #include"wrappers.h"
 
-/* given an icmp header struct, computes its checksum; taken from lecture */
+
 static uint16_t compute_icmp_checksum (const void *buff, int length){
 	uint32_t sum;
 	const uint16_t* ptr = buff;
@@ -12,137 +25,142 @@ static uint16_t compute_icmp_checksum (const void *buff, int length){
 	return (uint16_t)(~(sum + (sum >> 16)));
 }
 
-/* fill icmp structure with appropiate data and given sequence number*/
-static void set_icmp_header(struct icmp* header, int seq) {
-    header->icmp_type = ICMP_ECHO;
-    header->icmp_code = 0;
-    header->icmp_hun.ih_idseq.icd_id = htons(getpid());
-    header->icmp_hun.ih_idseq.icd_seq = htons(seq);
-    header->icmp_cksum = 0;
-    header->icmp_cksum = compute_icmp_checksum((u_int16_t*)header, sizeof(*header));
-}
+/* send icmp echo request to a specific ADDRESS with given TLL and SEQ */
+void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
+    struct icmp header = {0};
+    header.icmp_type = ICMP_ECHO;
+    header.icmp_hun.ih_idseq.icd_id = htons(getpid());
+    header.icmp_hun.ih_idseq.icd_seq = htons(seq);
+    header.icmp_cksum = compute_icmp_checksum(&header, sizeof(header));
 
-
-/* send n icmp packs to given address with given ttl */
-void send_icmp(int sockfd, struct sockaddr_in* address, int ttl, int n) {
     Setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
-
-    /* send icmp packs */
-    for (int i = 0; i < n; i++) {
-        struct icmp header;
-        set_icmp_header(&header, n*(ttl-1) + i + 1);
-        
-        Sendto(sockfd, &header, sizeof(header), 0, 
-            (struct sockaddr*) address, sizeof(*address));    
-    } 
+    Sendto(sockfd, &header, sizeof(header), 0, 
+        (struct sockaddr*) address, sizeof(*address));
 }
 
 // ===========================================================
 
-/* check if received icmp package is a response to some previously 
-sent icmp echo request (for given ttl). 
-Returns -1 if id or seq is invalid, else returns icmp type */
-static int get_icmp_type(const void* buffer, int ttl, int n) {
-    struct ip* ip_header = (struct ip*) buffer;
-    uint8_t* packet = (uint8_t*)buffer + 4*ip_header->ip_hl;
-    struct icmp* icmp_header = (struct icmp*) packet;
-    uint8_t type = icmp_header->icmp_type;
-    
-    if (type == ICMP_TIME_EXCEEDED) {
-        struct ip* inner_ip_header = &(icmp_header->icmp_dun.id_ip.idi_ip);
-        uint8_t* inner_packet = (uint8_t*)inner_ip_header + 4*inner_ip_header->ip_hl;
-        icmp_header = (struct icmp*) inner_packet;
-    }
-
-    if (ntohs(icmp_header->icmp_hun.ih_idseq.icd_id) != getpid())
-        return -1;
-    if ((ntohs(icmp_header->icmp_hun.ih_idseq.icd_seq) < (n*(ttl-1)+1)) ||
-        (ntohs(icmp_header->icmp_hun.ih_idseq.icd_seq) > (n*ttl)))
-        return -1;
-    
-    return (int)type;
+static inline struct icmp* get_icmp_pointer(struct ip* ip_header) {
+    return (struct icmp*)((uint8_t*)ip_header + 4*ip_header->ip_hl);
 }
 
-static int await_single_pack(int sockfd, struct timeval* tv) {
+static inline int check_id_seq(struct icmp* packet, int min_seq, int max_seq, int id) {
+    if (ntohs(packet->icmp_hun.ih_idseq.icd_id) != id)
+        return 0;
+    if (ntohs(packet->icmp_hun.ih_idseq.icd_seq) < min_seq || 
+        ntohs(packet->icmp_hun.ih_idseq.icd_seq) > max_seq)
+        return 0;
+    return 1;
+}
+
+/* If icmp package stored in `buffer` is destined for this instance
+of traceroute return 1, else return 0 */
+static int verify_icmp_pack(uint8_t* buffer, int min_seq, int max_seq, int id) {
+    struct icmp* icmp_packet = get_icmp_pointer((struct ip*)buffer);
+
+    if (icmp_packet->icmp_type == ICMP_TIME_EXCEEDED) {
+        struct icmp* inner_icmp_packet = get_icmp_pointer(&(icmp_packet->icmp_dun.id_ip.idi_ip));
+        if (!check_id_seq(inner_icmp_packet, min_seq, max_seq, id))
+            return 0;
+    }
+    else if (icmp_packet->icmp_type == ICMP_ECHOREPLY) {
+        if (!check_id_seq(icmp_packet, min_seq, max_seq, id))
+            return 0;
+    }
+    else
+        return 0;
+    
+    return 1;
+}
+
+static inline int get_icmp_type(uint8_t* buffer) {
+    struct icmp* icmp_packet = get_icmp_pointer((struct ip*)buffer);
+    return icmp_packet->icmp_type;
+}
+
+
+/* receive a single ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY packet 
+with seq value in range <min_seq, max_seq> */
+void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     fd_set descriptors;
-    FD_ZERO (&descriptors);
-    FD_SET (sockfd, &descriptors);
+    struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
+    ssize_t res;
+    uint8_t buffer[IP_MAXPACKET];
+    struct sockaddr_in sender;
+    socklen_t sender_len = sizeof(sender);
+    int icmp_type;
 
-    return Select(sockfd + 1, &descriptors, NULL, NULL, tv);
-}  
+    do {
+        FD_ZERO(&descriptors);
+        FD_SET(sockfd, &descriptors);
 
-/* if ECHOREPLY was received - returns 1, else 0 */
-int receive_icmp(int sockfd, int ttl, int n, int use_dns) {
-    in_addr_t ip_addrs[n];
-    int ip_count = 0;
-    int target_reached = 0;
-    int good_packs = 0;
-    double time_elapsed = 0;
-    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+        /* NOTE: "On Linux, select() modifies timeout to reflect the amount
+        of time not slept; most other implementations don't do this" */
+        res = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
+        if (res < 0)
+            perror("select");
+        else if (res == 0) {
+            response->rec_status = STATUS_TIMEOUT;
+            return;
+        }
+
+        res = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
+                (struct sockaddr*)&sender, &sender_len);
+        if (res < 0)
+            perror("recvfrom");
+    }  
+    while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
+
+    icmp_type = get_icmp_type(buffer);
+    if (icmp_type == ICMP_TIME_EXCEEDED)
+        response->rec_status = STATUS_TTL_EXCEEDED;
+    else if (icmp_type == ICMP_ECHOREPLY)
+        response->rec_status = STATUS_ECHOREPLY;
+
+    response->rec_addr = sender.sin_addr;
+}
+
+char* get_report(receive_t* responses, int num_packs) {
+    int i, j, num_addrs = 0, result_idx = 0;
+    struct in_addr distinct_addrs[num_packs];
+    char ip_addr_buf[INET_ADDRSTRLEN];
+    const int result_size = num_packs * (INET_ADDRSTRLEN+1);
+    char* result = malloc(result_size);
+    const char space = ' ';
     
-    /* receive packets unless all `n` received or the time is up */
-    while ((good_packs < n) && await_single_pack(sockfd, &tv)) {
-        uint8_t buffer[IP_MAXPACKET];
-        struct sockaddr_in sender;
-        socklen_t sender_len = sizeof(sender);
+    memset(result, 0, result_size);
 
-        Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
-            (struct sockaddr*)&sender, &sender_len);
+    if (responses[0].rec_status == STATUS_TIMEOUT) {
+        result[0] = '*';
+        return result;
+    }
 
-        int icmp_type = get_icmp_type(buffer, ttl, n);
-        if (icmp_type == ICMP_ECHOREPLY)
-            target_reached = 1;
-        else if (icmp_type != ICMP_TIME_EXCEEDED)
-            continue;
+    /* find distinct IP addresses */
+    for (i = 0; i < num_packs; i++) {
+        if (responses[i].rec_status != STATUS_ECHOREPLY &&
+            responses[i].rec_status != STATUS_TTL_EXCEEDED)
+            break;
         
-        good_packs++;
-        
-        /* calculate time spent on receiving this package */
-        struct timeval tv_end = { .tv_sec = 1, .tv_usec = 0 };
-        timersub(&tv_end, &tv, &tv_end);
-        time_elapsed += tv_end.tv_usec;
-
-        /* if the sender ip address has already occurred, dont add it to ip_addrs[];
-        otherwise we need to add it, so that we can print it later */
-        int j;
-        for (j = 0; j < ip_count; j++) 
-            if (sender.sin_addr.s_addr == ip_addrs[j])
+        for (j = 0; j < num_addrs; j++) {
+            if (responses[i].rec_addr.s_addr == distinct_addrs[j].s_addr)
                 break;
-        if (j == ip_count) {
-            ip_addrs[j] = sender.sin_addr.s_addr;
-            ip_count++;
         }
+        if (j == num_addrs)
+            distinct_addrs[num_addrs++] = responses[i].rec_addr;
     }
-    
-    printf("%d. ", ttl);
-    
-    /* no packets received, therefore nothing to print */
-    if (good_packs == 0) {
-        printf("*\n");
-        return target_reached;
-    }
-    
-    /* print every ip_addr, that responded to the ping request*/
-    for (int j = 0; j < ip_count; j++) {
-        char printable_addr[20] = {'\0'};
-        Inet_ntop(AF_INET, ip_addrs + j, printable_addr, sizeof(printable_addr));
-        
-        if (use_dns) { /* translate IPv4 address to a human-readable name */
-            struct addrinfo* res;
-            char hostname[NI_MAXHOST];
-            Getaddrinfo(printable_addr, NULL, NULL, &res);
-            int ret = Getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0, 0);
-            printf("%s ",((*hostname != '\0' && ret == 0) ? hostname : printable_addr));
-        }
-        else 
-            printf("%s ", printable_addr);
-    }
-    /* if all the responses were received, print avg response time */
-    if (good_packs == n)
-        printf("%.3fms", (time_elapsed / 1000) / n);
-    else 
-        printf("???");
-    putchar('\n');
 
-    return target_reached;
+    for (i = 0; i < num_addrs; i++) {
+        Inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN);
+        strncat(result, ip_addr_buf, INET_ADDRSTRLEN);
+        strncat(result, &space, 1);
+    }
+
+    return result;
+}
+
+int destination_reached(receive_t* responses, int num_packs) {
+    for (int i = 0; i < num_packs; i++)
+        if (responses[i].rec_status != STATUS_ECHOREPLY)
+            return 0;
+    return 1;
 }
