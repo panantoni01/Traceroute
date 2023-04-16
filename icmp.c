@@ -85,9 +85,9 @@ static inline int get_icmp_type(uint8_t* buffer) {
 /* Receive a single icmp packet. Store packet info (type, IP address, response time)
 in `response` and  return 1 if a package, that is destined to this instance of 
 tracerotute was received (check using verify_icmp_pack) or 0 elsewhere. */
-int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
+int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time, receive_t* response) {
     fd_set descriptors;
-    struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
+    struct timeval timeout = *wait_time;
     uint8_t buffer[IP_MAXPACKET];
     struct sockaddr_in sender;
     socklen_t sender_len = sizeof(sender);

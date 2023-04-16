@@ -13,7 +13,7 @@ typedef struct receive {
 
 
 void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq);
-int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response);
+int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time, receive_t* response);
 void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_send, int num_recv);
 int destination_reached(receive_t* responses, int num_send, int num_recv);
 
