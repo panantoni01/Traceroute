@@ -17,8 +17,6 @@ int main (int argc, char* argv[]) {
     int first_ttl = 1, max_ttl = 30, ttl, i, num_packs = 3, opt, sockfd;
     struct sockaddr_in address;
     static int seq = 0;
-    char* report;
-    const int report_size = num_packs * (INET_ADDRSTRLEN+1) + 512;
     struct timeval tv;
     
     while ((opt = getopt(argc, argv, "f:m:q:")) != -1) {
@@ -73,11 +71,7 @@ int main (int argc, char* argv[]) {
                 break;
         }
 
-        report = malloc(report_size);
-        memset(report, 0, report_size);
-        get_report(&tv, responses, num_packs, report);
-        printf("%d. %s\n", ttl, report);
-        free(report);
+        print_report(ttl, &tv, responses, num_packs);
 
         if (destination_reached(responses, num_packs))
             break;

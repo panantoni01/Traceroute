@@ -122,16 +122,15 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     response->rec_addr = sender.sin_addr;
 }
 
-void get_report(struct timeval* send_time, receive_t* responses, int num_packs, char* buffer) {
+void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_packs) {
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_packs];
-    char ip_addr_buf[INET_ADDRSTRLEN], elapsed_buf[512] = {0};
-    const char space = ' ';
+    char ip_addr_buf[INET_ADDRSTRLEN];
     long elapsed_us = 0;
     struct timeval tv;
 
     if (responses[0].rec_status == STATUS_TIMEOUT) {
-        buffer[0] = '*';
+        printf("%d. *\n", ttl);
         return;
     }
 
@@ -149,25 +148,25 @@ void get_report(struct timeval* send_time, receive_t* responses, int num_packs, 
             distinct_addrs[num_addrs++] = responses[i].rec_addr;
     }
 
+    printf("%d. ", ttl);
     for (i = 0; i < num_addrs; i++) {
+        memset(ip_addr_buf, 0, sizeof(ip_addr_buf));
         Inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN);
-        strncat(buffer, ip_addr_buf, INET_ADDRSTRLEN);
-        strncat(buffer, &space, 1);
+        printf("%s ", ip_addr_buf);
     }
 
 
     for (i = 0; i < num_packs; i++) {
         if (responses[i].rec_status != STATUS_ECHOREPLY &&
             responses[i].rec_status != STATUS_TTL_EXCEEDED) {
-            strcat(buffer, "???");
+            printf(" ???\n");
             return; 
         }
 
         timersub(&responses[i].rec_time, send_time, &tv);
         elapsed_us += tv.tv_usec + 1e6*tv.tv_sec;
     } 
-    snprintf(elapsed_buf, sizeof(elapsed_buf), "%.3fms", (double)elapsed_us / 1000 / num_packs);
-    strncat(buffer, elapsed_buf, strlen(elapsed_buf));
+    printf(" %.3fms\n", (double)elapsed_us / 1000 / num_packs);
 }
 
 int destination_reached(receive_t* responses, int num_packs) {
