@@ -79,9 +79,10 @@ static inline int get_icmp_type(uint8_t* buffer) {
 }
 
 
-/* receive a single ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY packet 
-with seq value in range <min_seq, max_seq> */
-void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
+/* Receive a single ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY packet 
+with seq value in range <min_seq, max_seq>.
+Return 1 if a valid package was received, 0 elsewhere */
+int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     fd_set descriptors;
     struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
     ssize_t res;
@@ -101,7 +102,7 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
             perror("select");
         else if (res == 0) {
             response->rec_status = STATUS_TIMEOUT;
-            return;
+            return 0;
         }
 
         gettimeofday(&response->rec_time, NULL);
@@ -120,26 +121,24 @@ void receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
         response->rec_status = STATUS_ECHOREPLY;
 
     response->rec_addr = sender.sin_addr;
+    
+    return 1;
 }
 
-void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_packs) {
+void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_send, int num_recv) {
     int i, j, num_addrs = 0;
-    struct in_addr distinct_addrs[num_packs];
+    struct in_addr distinct_addrs[num_recv];
     char ip_addr_buf[INET_ADDRSTRLEN];
     long elapsed_us = 0;
     struct timeval tv;
 
-    if (responses[0].rec_status == STATUS_TIMEOUT) {
+    if (num_recv == 0) {
         printf("%d. *\n", ttl);
         return;
     }
 
     /* find distinct IP addresses */
-    for (i = 0; i < num_packs; i++) {
-        if (responses[i].rec_status != STATUS_ECHOREPLY &&
-            responses[i].rec_status != STATUS_TTL_EXCEEDED)
-            break;
-        
+    for (i = 0; i < num_recv; i++) {       
         for (j = 0; j < num_addrs; j++) {
             if (responses[i].rec_addr.s_addr == distinct_addrs[j].s_addr)
                 break;
@@ -155,22 +154,21 @@ void print_report(int ttl, struct timeval* send_time, receive_t* responses, int 
         printf("%s ", ip_addr_buf);
     }
 
-
-    for (i = 0; i < num_packs; i++) {
-        if (responses[i].rec_status != STATUS_ECHOREPLY &&
-            responses[i].rec_status != STATUS_TTL_EXCEEDED) {
-            printf(" ???\n");
-            return; 
-        }
-
+    if (num_send < num_recv) {
+        printf(" ???\n");
+        return;
+    }
+    for (i = 0; i < num_recv; i++) {
         timersub(&responses[i].rec_time, send_time, &tv);
         elapsed_us += tv.tv_usec + 1e6*tv.tv_sec;
     } 
-    printf(" %.3fms\n", (double)elapsed_us / 1000 / num_packs);
+    printf(" %.3fms\n", (double)elapsed_us / 1000 / num_recv);
 }
 
-int destination_reached(receive_t* responses, int num_packs) {
-    for (int i = 0; i < num_packs; i++)
+int destination_reached(receive_t* responses, int num_send, int num_recv) {
+    if (num_recv < num_send)
+        return 0;
+    for (int i = 0; i < num_recv; i++)
         if (responses[i].rec_status != STATUS_ECHOREPLY)
             return 0;
     return 1;

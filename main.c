@@ -14,7 +14,7 @@
 
 // example.org: 93.184.216.34
 int main (int argc, char* argv[]) {
-    int first_ttl = 1, max_ttl = 30, ttl, i, num_packs = 3, opt, sockfd;
+    int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd;
     struct sockaddr_in address;
     static int seq = 0;
     struct timeval tv;
@@ -28,14 +28,14 @@ int main (int argc, char* argv[]) {
                 max_ttl = atoi(optarg);
                 break;
             case 'q':
-                num_packs = atoi(optarg);
-                if (num_packs <= 0) {
+                num_send = atoi(optarg);
+                if (num_send <= 0) {
                     fprintf(stderr, "Invalid argument for option -q\n");
                     exit(EXIT_FAILURE);
                 }
                 break;
             default:
-                fprintf(stderr, "Usage: %s [-f first_ttl] [-m max_ttl] [-q num_packs] ip_addr\n",
+                fprintf(stderr, "Usage: %s [-f first_ttl] [-m max_ttl] [-q num_send] ip_addr\n",
                            argv[0]);
                 exit(EXIT_FAILURE);
         }
@@ -60,20 +60,21 @@ int main (int argc, char* argv[]) {
         gettimeofday(&tv, NULL);
         
         /* send echo requests with given ttl and seq values */
-        for (i = 0; i < num_packs; i++)
+        for (i = 0; i < num_send; i++)
             send_icmp_echo(sockfd, &address, ttl, seq++);
         
-        receive_t responses[num_packs];
-        memset(responses, 0, num_packs * sizeof(receive_t));
-        for (i = 0; i < num_packs; i++) {
-            receive_icmp(sockfd, seq - num_packs, seq - 1, &responses[i]);
+        receive_t responses[num_send];
+        memset(responses, 0, num_send * sizeof(receive_t));
+        num_recv = 0;
+        for (i = 0; i < num_send; i++) {
+            num_recv += receive_icmp(sockfd, seq - num_send, seq - 1, &responses[i]);
             if (responses[i].rec_status == STATUS_TIMEOUT)
                 break;
         }
 
-        print_report(ttl, &tv, responses, num_packs);
+        print_report(ttl, &tv, responses, num_send, num_recv);
 
-        if (destination_reached(responses, num_packs))
+        if (destination_reached(responses, num_send, num_recv))
             break;
     }
 
