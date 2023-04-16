@@ -8,15 +8,17 @@
 #include<stdlib.h>
 #include<sys/time.h>
 #include<time.h>
+
 #include"icmp.h"
 #include"wrappers.h"
+#include"report.h"
 
 
 int main (int argc, char* argv[]) {
     int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd;
     struct sockaddr_in address;
     static int seq = 0;
-    struct timeval wait_time = { .tv_sec = 1, .tv_usec = 0 }, send_time;
+    struct timeval wait_time = { .tv_sec = 1, .tv_usec = 0 };
     
     while ((opt = getopt(argc, argv, "f:m:q:w:")) != -1) {
         switch (opt) {
@@ -55,13 +57,14 @@ int main (int argc, char* argv[]) {
     Inet_pton(AF_INET, argv[optind], &address.sin_addr);
     
     for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
-        Gettimeofday(&send_time, NULL);
-
-        for (i = 0; i < num_send; i++)
-            send_icmp_echo(sockfd, &address, ttl, seq++);
-        
         receive_t responses[num_send];
         memset(responses, 0, num_send * sizeof(receive_t));
+
+        for (i = 0; i < num_send; i++) {
+            send_icmp_echo(sockfd, &address, ttl, seq++);
+            Gettimeofday(&responses[i].rec_send_time, NULL);
+        }
+        
         num_recv = 0;
         for (i = 0; i < num_send; i++) {
             if (receive_icmp(sockfd, seq - num_send, seq - 1, &wait_time, &responses[i]) == 0)
@@ -69,7 +72,7 @@ int main (int argc, char* argv[]) {
             num_recv++;
         }
 
-        print_report(ttl, &send_time, responses, num_send, num_recv);
+        print_report(ttl, responses, num_send, num_recv);
 
         if (destination_reached(responses, num_send, num_recv))
             break;
