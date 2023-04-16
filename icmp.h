@@ -4,14 +4,9 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 
-typedef enum {
-    STATUS_TTL_EXCEEDED = 1,
-    STATUS_ECHOREPLY = 2,
-    STATUS_TIMEOUT = 3
-} icmp_status_t;
 
 typedef struct receive {
-    icmp_status_t rec_status;
+    int rec_icmp_type;
     struct in_addr rec_addr;
     struct timeval rec_time;
 } receive_t;

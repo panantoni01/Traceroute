@@ -89,7 +89,6 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     uint8_t buffer[IP_MAXPACKET];
     struct sockaddr_in sender;
     socklen_t sender_len = sizeof(sender);
-    int icmp_type;
 
     do {
         FD_ZERO(&descriptors);
@@ -100,10 +99,8 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
         res = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
         if (res < 0)
             perror("select");
-        else if (res == 0) {
-            response->rec_status = STATUS_TIMEOUT;
+        else if (res == 0)
             return 0;
-        }
 
         gettimeofday(&response->rec_time, NULL);
 
@@ -114,14 +111,8 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 
-    icmp_type = get_icmp_type(buffer);
-    if (icmp_type == ICMP_TIME_EXCEEDED)
-        response->rec_status = STATUS_TTL_EXCEEDED;
-    else if (icmp_type == ICMP_ECHOREPLY)
-        response->rec_status = STATUS_ECHOREPLY;
-
+    response->rec_icmp_type = get_icmp_type(buffer);
     response->rec_addr = sender.sin_addr;
-    
     return 1;
 }
 
@@ -169,7 +160,7 @@ int destination_reached(receive_t* responses, int num_send, int num_recv) {
     if (num_recv < num_send)
         return 0;
     for (int i = 0; i < num_recv; i++)
-        if (responses[i].rec_status != STATUS_ECHOREPLY)
+        if (responses[i].rec_icmp_type != ICMP_ECHOREPLY)
             return 0;
     return 1;
 }

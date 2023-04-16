@@ -67,9 +67,9 @@ int main (int argc, char* argv[]) {
         memset(responses, 0, num_send * sizeof(receive_t));
         num_recv = 0;
         for (i = 0; i < num_send; i++) {
-            num_recv += receive_icmp(sockfd, seq - num_send, seq - 1, &responses[i]);
-            if (responses[i].rec_status == STATUS_TIMEOUT)
+            if (receive_icmp(sockfd, seq - num_send, seq - 1, &responses[i]) == 0)
                 break;
+            num_recv++;
         }
 
         print_report(ttl, &tv, responses, num_send, num_recv);
