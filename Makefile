@@ -9,7 +9,7 @@ CPPFLAGS = -D_GNU_SOURCE
 
 $(PROGRAM): $(OBJECTS)
 	@echo "[LD] $(OBJECTS) -> $@"
-	$(CC) -o $@ $(OBJECTS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(OBJECTS)
 
 %.o: %.d
 
