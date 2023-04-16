@@ -115,6 +115,14 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
 
 // ================================================================
 
+/* TODO - arguments should be:
+1. ttl
+2. responses
+3. bool calc_avg_time
+4. bool use_dns */
+/* TODO - split into:
+1. print_addresses
+2. print_avg_time */
 void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_send, int num_recv) {
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_recv];
