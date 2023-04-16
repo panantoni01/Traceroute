@@ -38,7 +38,7 @@ void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
         (struct sockaddr*) address, sizeof(*address));
 }
 
-// ===========================================================
+// ================================================================
 
 static inline struct icmp* get_icmp_pointer(struct ip* ip_header) {
     return (struct icmp*)((uint8_t*)ip_header + 4*ip_header->ip_hl);
@@ -53,8 +53,11 @@ static inline int check_id_seq(struct icmp* packet, int min_seq, int max_seq, in
     return 1;
 }
 
-/* If icmp package stored in `buffer` is destined for this instance
-of traceroute return 1, else return 0 */
+/* If icmp package stored in `buffer` is destined for this instance of traceroute, i.e:
+** its type is ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY and
+** its id is equal to `id` and
+** its seq value is from range <`min_seq`, `max_seq`>
+then return 1, else 0 */
 static int verify_icmp_pack(uint8_t* buffer, int min_seq, int max_seq, int id) {
     struct icmp* icmp_packet = get_icmp_pointer((struct ip*)buffer);
 
@@ -79,9 +82,9 @@ static inline int get_icmp_type(uint8_t* buffer) {
 }
 
 
-/* Receive a single ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY packet 
-with seq value in range <min_seq, max_seq>.
-Return 1 if a valid package was received, 0 elsewhere */
+/* Receive a single icmp packet. Store packet info (type, IP address, response time)
+in `response` and  return 1 if a package, that is destined to this instance of 
+tracerotute was received (check using verify_icmp_pack) or 0 elsewhere. */
 int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     fd_set descriptors;
     struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
@@ -116,6 +119,8 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     return 1;
 }
 
+// ================================================================
+
 void print_report(int ttl, struct timeval* send_time, receive_t* responses, int num_send, int num_recv) {
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_recv];
@@ -128,7 +133,6 @@ void print_report(int ttl, struct timeval* send_time, receive_t* responses, int 
         return;
     }
 
-    /* find distinct IP addresses */
     for (i = 0; i < num_recv; i++) {       
         for (j = 0; j < num_addrs; j++) {
             if (responses[i].rec_addr.s_addr == distinct_addrs[j].s_addr)

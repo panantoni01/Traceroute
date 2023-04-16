@@ -12,7 +12,6 @@
 #include"wrappers.h"
 
 
-// example.org: 93.184.216.34
 int main (int argc, char* argv[]) {
     int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd;
     struct sockaddr_in address;
@@ -46,20 +45,15 @@ int main (int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    /* create raw socket */
     sockfd = Socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
-    /* create sockadrr_in address structure */
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     Inet_pton(AF_INET, argv[optind], &address.sin_addr);
     
     for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
-        /* get current timestamp to measure time between sending echo requests
-        and receiving a response ICMP_TIME_EXCEEDED or ICMP_ECHOREPLY */
         gettimeofday(&tv, NULL);
-        
-        /* send echo requests with given ttl and seq values */
+
         for (i = 0; i < num_send; i++)
             send_icmp_echo(sockfd, &address, ttl, seq++);
         
