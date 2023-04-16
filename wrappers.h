@@ -22,5 +22,6 @@ ssize_t Recvfrom(int sockfd, void *buf, size_t len, int flags,
                         struct sockaddr *src_addr, socklen_t *addrlen);
 int Select(int nfds, fd_set *readfds, fd_set *writefds,
                   fd_set *exceptfds, struct timeval *timeout);
+int Gettimeofday(struct timeval* tv, struct timezone* tz);
 
 #endif /* !WRAPPERS_H */

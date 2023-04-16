@@ -88,7 +88,6 @@ tracerotute was received (check using verify_icmp_pack) or 0 elsewhere. */
 int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
     fd_set descriptors;
     struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
-    ssize_t res;
     uint8_t buffer[IP_MAXPACKET];
     struct sockaddr_in sender;
     socklen_t sender_len = sizeof(sender);
@@ -99,18 +98,13 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, receive_t* response) {
 
         /* NOTE: "On Linux, select() modifies timeout to reflect the amount
         of time not slept; most other implementations don't do this" */
-        res = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
-        if (res < 0)
-            perror("select");
-        else if (res == 0)
+        if (!Select(sockfd + 1, &descriptors, NULL, NULL, &timeout))
             return 0;
 
-        gettimeofday(&response->rec_time, NULL);
+        Gettimeofday(&response->rec_time, NULL);
 
-        res = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
+        Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len);
-        if (res < 0)
-            perror("recvfrom");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 

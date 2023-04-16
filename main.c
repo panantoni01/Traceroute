@@ -52,7 +52,7 @@ int main (int argc, char* argv[]) {
     Inet_pton(AF_INET, argv[optind], &address.sin_addr);
     
     for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
-        gettimeofday(&tv, NULL);
+        Gettimeofday(&tv, NULL);
 
         for (i = 0; i < num_send; i++)
             send_icmp_echo(sockfd, &address, ttl, seq++);
