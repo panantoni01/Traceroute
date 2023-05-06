@@ -15,13 +15,16 @@
 
 
 int main (int argc, char* argv[]) {
-    int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd;
+    int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd, use_dns = 1;
     struct sockaddr_in address;
     static int seq = 0;
     struct timeval wait_time = { .tv_sec = 1, .tv_usec = 0 };
     
-    while ((opt = getopt(argc, argv, "f:m:q:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "nf:m:q:w:")) != -1) {
         switch (opt) {
+            case 'n':
+                use_dns = 0;
+                break;
             case 'f':
                 first_ttl = atoi(optarg);
                 break;
@@ -72,7 +75,7 @@ int main (int argc, char* argv[]) {
             num_recv++;
         }
 
-        print_report(ttl, responses, num_send, num_recv);
+        print_report(ttl, responses, num_send, num_recv, use_dns);
 
         if (destination_reached(responses, num_send, num_recv))
             break;
