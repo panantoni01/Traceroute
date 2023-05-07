@@ -12,6 +12,7 @@
 #include<netdb.h>
 
 #include"icmp.h"
+#include"common.h"
 
 
 static uint16_t compute_icmp_checksum (const void *buff, int length){
@@ -35,12 +36,12 @@ void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
 
     ret = setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
     if (ret < 0)
-        perror("setsockopt");
+        ERR_EXIT("setsockopt");
     
     ret = sendto(sockfd, &header, sizeof(header), 0, 
         (struct sockaddr*) address, sizeof(*address));
     if (ret < 0)
-        perror("sendto");
+        ERR_EXIT("sendto");
 }
 
 // ================================================================
@@ -107,18 +108,18 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
         of time not slept; most other implementations don't do this" */
         ret = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
         if (ret < 0)
-            perror("select");
+            ERR_EXIT("select");
         else if (!ret)
             return 0;
 
         ret = gettimeofday(&response->rec_rec_time, NULL);
         if (ret < 0)
-            perror("gettimeofday");
+            ERR_EXIT("gettimeofday");
 
         ret = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len);
         if (ret < 0)
-            perror("recvfrom");
+            ERR_EXIT("recvfrom");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 

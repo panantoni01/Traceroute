@@ -6,6 +6,7 @@
 
 #include "report.h"
 #include "icmp.h"
+#include "common.h"
 
 
 static char* reverse_dns_lookup(struct in_addr *ip_addr, char hostname[NI_MAXHOST]) {
@@ -38,7 +39,7 @@ static void print_ip_addrs(receive_t* responses, int num_recv, int use_dns) {
         memset(ip_addr_buf, 0, sizeof(ip_addr_buf));
         ret = inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN);
         if (ret == NULL)
-            perror("inet_ntop");
+            ERR_EXIT("inet_ntop");
         if (!use_dns)
             printf(" %s", ip_addr_buf);
         else if (reverse_dns_lookup(&(distinct_addrs[i]), hostname))

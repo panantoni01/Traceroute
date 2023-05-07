@@ -11,6 +11,7 @@
 
 #include"icmp.h"
 #include"report.h"
+#include"common.h"
 
 
 int main (int argc, char* argv[]) {
@@ -55,7 +56,7 @@ int main (int argc, char* argv[]) {
     
     sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (sockfd < 0)
-        perror("socket");
+        ERR_EXIT("socket");
 
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
@@ -63,7 +64,7 @@ int main (int argc, char* argv[]) {
     if (ret == 0)
         fprintf(stderr, "ERROR: invalid ip address!\n");
     else if (ret < 0)
-       perror("inet_pton");
+       ERR_EXIT("inet_pton");
     
     for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
         receive_t responses[num_send];
@@ -73,7 +74,7 @@ int main (int argc, char* argv[]) {
             send_icmp_echo(sockfd, &address, ttl, seq++);
             ret = gettimeofday(&responses[i].rec_send_time, NULL);
             if (ret < 0)
-                perror("gettimeofday");
+                ERR_EXIT("gettimeofday");
         }
         
         num_recv = 0;
