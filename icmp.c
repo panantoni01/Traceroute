@@ -12,7 +12,6 @@
 #include<netdb.h>
 
 #include"icmp.h"
-#include"wrappers.h"
 
 
 static uint16_t compute_icmp_checksum (const void *buff, int length){
@@ -27,15 +26,21 @@ static uint16_t compute_icmp_checksum (const void *buff, int length){
 
 /* send icmp echo request to a specific ADDRESS with given TLL and SEQ */
 void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
+    ssize_t ret;
     struct icmp header = {0};
     header.icmp_type = ICMP_ECHO;
     header.icmp_hun.ih_idseq.icd_id = htons(getpid());
     header.icmp_hun.ih_idseq.icd_seq = htons(seq);
     header.icmp_cksum = compute_icmp_checksum(&header, sizeof(header));
 
-    Setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
-    Sendto(sockfd, &header, sizeof(header), 0, 
+    ret = setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
+    if (ret < 0)
+        perror("setsockopt");
+    
+    ret = sendto(sockfd, &header, sizeof(header), 0, 
         (struct sockaddr*) address, sizeof(*address));
+    if (ret < 0)
+        perror("sendto");
 }
 
 // ================================================================
@@ -87,6 +92,7 @@ tracerotute and store packet info (type, IP address, response time) in `response
 Return 1 if a package, that is destined to this instance of 
 tracerotute was received or 0 if `wait_time` exceeded. */
 int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time, receive_t* response) {
+    ssize_t ret;
     fd_set descriptors;
     struct timeval timeout = *wait_time;
     uint8_t buffer[IP_MAXPACKET];
@@ -99,13 +105,20 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
 
         /* NOTE: "On Linux, select() modifies timeout to reflect the amount
         of time not slept; most other implementations don't do this" */
-        if (!Select(sockfd + 1, &descriptors, NULL, NULL, &timeout))
+        ret = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
+        if (ret < 0)
+            perror("select");
+        else if (!ret)
             return 0;
 
-        Gettimeofday(&response->rec_rec_time, NULL);
+        ret = gettimeofday(&response->rec_rec_time, NULL);
+        if (ret < 0)
+            perror("gettimeofday");
 
-        Recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
+        ret = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len);
+        if (ret < 0)
+            perror("recvfrom");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 

@@ -10,11 +10,11 @@
 #include<time.h>
 
 #include"icmp.h"
-#include"wrappers.h"
 #include"report.h"
 
 
 int main (int argc, char* argv[]) {
+    ssize_t ret;
     int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd, use_dns = 1;
     struct sockaddr_in address;
     static int seq = 0;
@@ -53,11 +53,17 @@ int main (int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    sockfd = Socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (sockfd < 0)
+        perror("socket");
 
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
-    Inet_pton(AF_INET, argv[optind], &address.sin_addr);
+    ret = inet_pton(AF_INET, argv[optind], &address.sin_addr);
+    if (ret == 0)
+        fprintf(stderr, "ERROR: invalid ip address!\n");
+    else if (ret < 0)
+       perror("inet_pton");
     
     for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
         receive_t responses[num_send];
@@ -65,7 +71,9 @@ int main (int argc, char* argv[]) {
 
         for (i = 0; i < num_send; i++) {
             send_icmp_echo(sockfd, &address, ttl, seq++);
-            Gettimeofday(&responses[i].rec_send_time, NULL);
+            ret = gettimeofday(&responses[i].rec_send_time, NULL);
+            if (ret < 0)
+                perror("gettimeofday");
         }
         
         num_recv = 0;
