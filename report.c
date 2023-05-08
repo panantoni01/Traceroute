@@ -21,7 +21,6 @@ static char* reverse_dns_lookup(struct in_addr *ip_addr, char hostname[NI_MAXHOS
 }
 
 static void print_ip_addrs(receive_t* responses, int num_recv, int use_dns) {
-    const char* ret;
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_recv];
     char ip_addr_buf[INET_ADDRSTRLEN];
@@ -37,8 +36,7 @@ static void print_ip_addrs(receive_t* responses, int num_recv, int use_dns) {
     }
     for (i = 0; i < num_addrs; i++) {
         memset(ip_addr_buf, 0, sizeof(ip_addr_buf));
-        ret = inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN);
-        if (ret == NULL)
+        if (!inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN))
             ERR_EXIT("inet_ntop");
         if (!use_dns)
             printf(" %s", ip_addr_buf);

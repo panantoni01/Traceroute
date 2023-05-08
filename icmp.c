@@ -27,20 +27,17 @@ static uint16_t compute_icmp_checksum (const void *buff, int length){
 
 /* send icmp echo request to a specific ADDRESS with given TLL and SEQ */
 void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
-    ssize_t ret;
     struct icmp header = {0};
     header.icmp_type = ICMP_ECHO;
     header.icmp_hun.ih_idseq.icd_id = htons(getpid());
     header.icmp_hun.ih_idseq.icd_seq = htons(seq);
     header.icmp_cksum = compute_icmp_checksum(&header, sizeof(header));
 
-    ret = setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
-    if (ret < 0)
+    if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
         ERR_EXIT("setsockopt");
     
-    ret = sendto(sockfd, &header, sizeof(header), 0, 
-        (struct sockaddr*) address, sizeof(*address));
-    if (ret < 0)
+    if (sendto(sockfd, &header, sizeof(header), 0, 
+        (struct sockaddr*) address, sizeof(*address)) < 0)
         ERR_EXIT("sendto");
 }
 
@@ -112,13 +109,11 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
         else if (!ret)
             return 0;
 
-        ret = gettimeofday(&response->rec_rec_time, NULL);
-        if (ret < 0)
+        if (gettimeofday(&response->rec_rec_time, NULL) < 0)
             ERR_EXIT("gettimeofday");
 
-        ret = recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
-                (struct sockaddr*)&sender, &sender_len);
-        if (ret < 0)
+        if (recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
+                (struct sockaddr*)&sender, &sender_len) < 0)
             ERR_EXIT("recvfrom");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));

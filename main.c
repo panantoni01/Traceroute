@@ -72,8 +72,7 @@ int main (int argc, char* argv[]) {
 
         for (i = 0; i < num_send; i++) {
             send_icmp_echo(sockfd, &address, ttl, seq++);
-            ret = gettimeofday(&responses[i].rec_send_time, NULL);
-            if (ret < 0)
+            if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
                 ERR_EXIT("gettimeofday");
         }
         
