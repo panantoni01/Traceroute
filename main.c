@@ -10,37 +10,47 @@
 #include<time.h>
 
 #include"icmp.h"
-#include"report.h"
 #include"common.h"
 
 
 int main (int argc, char* argv[]) {
     ssize_t ret;
-    int first_ttl = 1, max_ttl = 30, ttl, i, num_send = 3, num_recv, opt, sockfd, use_dns = 1;
-    struct sockaddr_in address;
-    static int seq = 0;
-    struct timeval wait_time = { .tv_sec = 1, .tv_usec = 0 };
+    int opt;
+    config_t config = {
+        .wait_time = { .tv_sec = 1, .tv_usec = 0 },
+        .first_ttl = 1,
+        .max_ttl = 30,
+        .num_send = 3,
+        .use_dns = 1,
+        .mode = MODE_ICMP
+    };
     
-    while ((opt = getopt(argc, argv, "nf:m:q:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "IUnf:m:q:w:")) != -1) {
         switch (opt) {
             case 'n':
-                use_dns = 0;
+                config.use_dns = 0;
                 break;
             case 'f':
-                first_ttl = atoi(optarg);
+                config.first_ttl = atoi(optarg);
                 break;
             case 'm':
-                max_ttl = atoi(optarg);
+                config.max_ttl = atoi(optarg);
                 break;
             case 'q':
-                num_send = atoi(optarg);
-                if (num_send <= 0) {
+                config.num_send = atoi(optarg);
+                if (config.num_send <= 0) {
                     fprintf(stderr, "Invalid argument for option -q\n");
                     exit(EXIT_FAILURE);
                 }
                 break;
             case 'w':
-                wait_time.tv_sec = (long int)atoi(optarg);
+                config.wait_time.tv_sec = (long int)atoi(optarg);
+                break;
+            case 'U':
+                config.mode = MODE_UDP;
+                break;
+            case 'I':
+                config.mode = MODE_ICMP;
                 break;
             default:
                 fprintf(stderr, "Usage: %s [-f first_ttl] [-m max_ttl] [-q num_send] [-w wait_time] ip_addr\n",
@@ -54,36 +64,21 @@ int main (int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-    if (sockfd < 0)
-        ERR_EXIT("socket");
-
-    memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    ret = inet_pton(AF_INET, argv[optind], &address.sin_addr);
-    if (ret == 0)
+    memset(&config.address, 0, sizeof(config.address));
+    config.address.sin_family = AF_INET;
+    ret = inet_pton(AF_INET, argv[optind], &config.address.sin_addr);
+    if (ret == 0) {
         fprintf(stderr, "ERROR: invalid ip address!\n");
+        exit(EXIT_FAILURE);
+    }
     else if (ret < 0)
        ERR_EXIT("inet_pton");
-    
-    for (ttl = first_ttl; ttl <= max_ttl; ttl++) {
-        receive_t responses[num_send];
-        memset(responses, 0, num_send * sizeof(receive_t));
 
-        for (i = 0; i < num_send; i++) {
-            send_icmp_echo(sockfd, &address, ttl, seq++);
-            if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
-                ERR_EXIT("gettimeofday");
-        }
-        
-        for (num_recv = 0; num_recv < num_send; num_recv++)
-            if (receive_icmp(sockfd, seq - num_send, seq - 1, &wait_time, &responses[num_recv]) == 0)
-                break;
-
-        print_report(ttl, responses, num_send, num_recv, use_dns);
-
-        if (destination_reached(responses, num_send, num_recv))
-            break;
+    if (config.mode == MODE_ICMP)
+        icmp_main(&config);
+    else {
+        fprintf(stderr, "Unknown traceroute mode: %u\n", config.mode);
+        exit(EXIT_FAILURE);
     }
 
     return 0;

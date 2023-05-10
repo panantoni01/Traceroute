@@ -13,6 +13,7 @@
 
 #include"icmp.h"
 #include"common.h"
+#include"report.h"
 
 
 static uint16_t compute_icmp_checksum (const void *buff, int length){
@@ -26,7 +27,7 @@ static uint16_t compute_icmp_checksum (const void *buff, int length){
 }
 
 /* send icmp echo request to a specific ADDRESS with given TLL and SEQ */
-void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
+static void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int seq) {
     struct icmp header = {0};
     header.icmp_type = ICMP_ECHO;
     header.icmp_hun.ih_idseq.icd_id = htons(getpid());
@@ -89,7 +90,7 @@ static inline int get_icmp_type(uint8_t* buffer) {
 tracerotute and store packet info (type, IP address, response time) in `response`.
 Return 1 if a package, that is destined to this instance of 
 tracerotute was received or 0 if `wait_time` exceeded. */
-int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time, receive_t* response) {
+static int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time, receive_t* response) {
     ssize_t ret;
     fd_set descriptors;
     struct timeval timeout = *wait_time;
@@ -124,11 +125,39 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
     return 1;
 }
 
-int destination_reached(receive_t* responses, int num_send, int num_recv) {
+static int destination_reached(receive_t* responses, int num_send, int num_recv) {
     if (num_recv < num_send)
         return 0;
     for (int i = 0; i < num_recv; i++)
         if (responses[i].rec_icmp_type != ICMP_ECHOREPLY)
             return 0;
     return 1;
+}
+
+void icmp_main(config_t* config) {
+    int sockfd, ttl, i, num_recv, seq = 0;
+    
+    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+    if (sockfd < 0)
+        ERR_EXIT("socket");
+    
+    for (ttl = config->first_ttl; ttl <= config->max_ttl; ttl++) {
+        receive_t responses[config->num_send];
+        memset(responses, 0, config->num_send * sizeof(receive_t));
+
+        for (i = 0; i < config->num_send; i++) {
+            send_icmp_echo(sockfd, &config->address, ttl, seq++);
+            if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
+                ERR_EXIT("gettimeofday");
+        }
+        
+        for (num_recv = 0; num_recv < config->num_send; num_recv++)
+            if (receive_icmp(sockfd, seq - config->num_send, seq - 1, &config->wait_time, &responses[num_recv]) == 0)
+                break;
+
+        print_report(ttl, responses, config->num_send, num_recv, config->use_dns);
+
+        if (destination_reached(responses, config->num_send, num_recv))
+            break;
+    }
 }
