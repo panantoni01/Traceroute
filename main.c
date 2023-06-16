@@ -10,6 +10,7 @@
 #include<time.h>
 
 #include"icmp.h"
+#include"udp.h"
 #include"common.h"
 
 
@@ -22,7 +23,8 @@ int main (int argc, char* argv[]) {
         .max_ttl = 30,
         .num_send = 3,
         .use_dns = 1,
-        .mode = MODE_ICMP
+        .mode = MODE_ICMP,
+        .dest_port = 33434
     };
     
     while ((opt = getopt(argc, argv, "IUnf:m:q:w:")) != -1) {
@@ -76,6 +78,8 @@ int main (int argc, char* argv[]) {
 
     if (config.mode == MODE_ICMP)
         icmp_main(&config);
+    else if (config.mode == MODE_UDP)
+        udp_main(&config);
     else {
         fprintf(stderr, "Unknown traceroute mode: %u\n", config.mode);
         exit(EXIT_FAILURE);

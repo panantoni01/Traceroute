@@ -1,5 +1,5 @@
 PROGRAM = traceroute
-SOURCES = main.c icmp.c report.c
+SOURCES = main.c icmp.c report.c udp.c
 BUILDDIR = build
 OBJECTS = $(SOURCES:%.c=$(BUILDDIR)/%.o)
 DEPENDENCY-FILES = $(SOURCES:%.c=$(BUILDDIR)/%.d)

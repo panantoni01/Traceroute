@@ -32,6 +32,7 @@ typedef struct config {
     int num_send;
     int use_dns; 
     trace_mode_t mode;
+    uint16_t dest_port;
 } config_t;
 
 #endif /* COMMON_H */
