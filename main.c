@@ -27,7 +27,7 @@ int main (int argc, char* argv[]) {
         .dest_port = 33434
     };
     
-    while ((opt = getopt(argc, argv, "IUnf:m:q:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "IUnf:m:q:w:s:")) != -1) {
         switch (opt) {
             case 'n':
                 config.use_dns = 0;
@@ -47,6 +47,9 @@ int main (int argc, char* argv[]) {
                 break;
             case 'w':
                 config.wait_time.tv_sec = (long int)atoi(optarg);
+                break;
+            case 's':
+                config.dest_port = (uint16_t)atoi(optarg);
                 break;
             case 'U':
                 config.mode = MODE_UDP;

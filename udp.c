@@ -17,7 +17,6 @@ void send_udp_probe(int sendfd, struct sockaddr_in* address, int ttl) {
 
 void udp_main(config_t* config) {
     int sendfd, ttl, i;
-    /* TODO - better dest_port handling */
     uint16_t dest_port = config->dest_port;
 
     sendfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
