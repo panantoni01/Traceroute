@@ -6,11 +6,6 @@
 #include<arpa/inet.h>
 #include<sys/time.h>
 
-#define ERR_EXIT(msg) \
-    do { \
-        perror(msg); \
-        exit(EXIT_FAILURE); \
-    } while(0)
 
 typedef struct receive {
     int rec_icmp_type;
@@ -34,5 +29,7 @@ typedef struct config {
     trace_mode_t mode;
     uint16_t dest_port;
 } config_t;
+
+void eprintf(const char *fmt, ...);
 
 #endif /* COMMON_H */

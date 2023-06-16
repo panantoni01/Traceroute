@@ -35,11 +35,11 @@ static void send_icmp_echo(int sockfd, struct sockaddr_in* address, int ttl, int
     header.icmp_cksum = compute_icmp_checksum(&header, sizeof(header));
 
     if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
-        ERR_EXIT("setsockopt");
+        eprintf("setsockopt:");
     
     if (sendto(sockfd, &header, sizeof(header), 0, 
         (struct sockaddr*) address, sizeof(*address)) < 0)
-        ERR_EXIT("sendto");
+        eprintf("sendto:");
 }
 
 // ================================================================
@@ -106,19 +106,19 @@ static int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wa
         of time not slept; most other implementations don't do this" */
         ret = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
         if (ret < 0)
-            ERR_EXIT("select");
+            eprintf("select:");
         else if (!ret)
             return 0;
 
         if (recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len) < 0)
-            ERR_EXIT("recvfrom");
+            eprintf("recvfrom:");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 
     /* Collect some statistics needed later for report printing */
     if (gettimeofday(&response->rec_rec_time, NULL) < 0)
-        ERR_EXIT("gettimeofday");
+        eprintf("gettimeofday:");
     response->rec_icmp_type = get_icmp_type(buffer);
     response->rec_addr = sender.sin_addr;
 
@@ -139,7 +139,7 @@ void icmp_main(config_t* config) {
     
     sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (sockfd < 0)
-        ERR_EXIT("socket");
+        eprintf("socket:");
     
     for (ttl = config->first_ttl; ttl <= config->max_ttl; ttl++) {
         receive_t responses[config->num_send];
@@ -148,7 +148,7 @@ void icmp_main(config_t* config) {
         for (i = 0; i < config->num_send; i++) {
             send_icmp_echo(sockfd, &config->address, ttl, seq++);
             if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
-                ERR_EXIT("gettimeofday");
+                eprintf("gettimeofday:");
         }
         
         for (num_recv = 0; num_recv < config->num_send; num_recv++)

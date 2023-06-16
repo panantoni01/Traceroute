@@ -77,7 +77,7 @@ int main (int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
     else if (ret < 0)
-       ERR_EXIT("inet_pton");
+       eprintf("inet_pton:");
 
     if (config.mode == MODE_ICMP)
         icmp_main(&config);

@@ -37,7 +37,7 @@ static void print_ip_addrs(receive_t* responses, int num_recv, int use_dns) {
     for (i = 0; i < num_addrs; i++) {
         memset(ip_addr_buf, 0, sizeof(ip_addr_buf));
         if (!inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN))
-            ERR_EXIT("inet_ntop");
+            eprintf("inet_ntop:");
         if (!use_dns)
             printf(" %s", ip_addr_buf);
         else if (reverse_dns_lookup(&(distinct_addrs[i]), hostname))
