@@ -76,12 +76,9 @@ int main (int argc, char* argv[]) {
                 ERR_EXIT("gettimeofday");
         }
         
-        num_recv = 0;
-        for (i = 0; i < num_send; i++) {
-            if (receive_icmp(sockfd, seq - num_send, seq - 1, &wait_time, &responses[i]) == 0)
+        for (num_recv = 0; num_recv < num_send; num_recv++)
+            if (receive_icmp(sockfd, seq - num_send, seq - 1, &wait_time, &responses[num_recv]) == 0)
                 break;
-            num_recv++;
-        }
 
         print_report(ttl, responses, num_send, num_recv, use_dns);
 

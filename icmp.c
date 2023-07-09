@@ -109,17 +109,18 @@ int receive_icmp(int sockfd, int min_seq, int max_seq, struct timeval* wait_time
         else if (!ret)
             return 0;
 
-        if (gettimeofday(&response->rec_rec_time, NULL) < 0)
-            ERR_EXIT("gettimeofday");
-
         if (recvfrom (sockfd, buffer, IP_MAXPACKET, MSG_DONTWAIT,
                 (struct sockaddr*)&sender, &sender_len) < 0)
             ERR_EXIT("recvfrom");
     }  
     while (!verify_icmp_pack(buffer, min_seq, max_seq, getpid()));
 
+    /* Collect some statistics needed later for report printing */
+    if (gettimeofday(&response->rec_rec_time, NULL) < 0)
+        ERR_EXIT("gettimeofday");
     response->rec_icmp_type = get_icmp_type(buffer);
     response->rec_addr = sender.sin_addr;
+
     return 1;
 }
 
