@@ -19,23 +19,18 @@ void send_udp_probe(int sockfd, struct sockaddr_in* address, int ttl) {
 }
 
 /* Verify whether a single received icmp package in `cmsg` is a response to
-some previously sent UDP probe to a port between `min_port`, `max_port` */
-static unsigned int verify_icmp(
-    struct cmsghdr* cmsg,
-    uint16_t min_port,
-    uint16_t max_port) {
+some previously sent UDP probe. */
+static unsigned int verify_icmp(struct cmsghdr* cmsg) {
 
     return 1;
 }
 
 /* Receive icmps from `sockfd` that correspond to some previously sent UDP
-probes to ports between `min_port`, `max_port`. Store statistics in `responses`
+probes. Store statistics in `responses`.
 
 Return number of received icmp packages */
 static unsigned int receive_icmps(
     int sockfd,
-    uint16_t min_port,
-    uint16_t max_port,
     receive_t** responses,
     config_t* config) {
 
@@ -75,7 +70,7 @@ static unsigned int receive_icmps(
         
         for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
                    cmsg = CMSG_NXTHDR(&msg, cmsg))
-            num_recv += verify_icmp(cmsg, min_port, max_port);
+            num_recv += verify_icmp(cmsg);
     }
     while (num_recv < config->num_send);
 
@@ -88,15 +83,15 @@ void udp_main(config_t* config) {
     struct sockaddr_in send_address = config->address;
     uint16_t dest_port = config->dest_port;
 
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-        eprintf("socket:");
-    
-    if (setsockopt(sockfd, SOL_IP, IP_RECVERR, &recverr, sizeof(recverr)) < 0)
-        eprintf("setsockopt:");
-
     for (ttl = config->first_ttl; ttl <= config->max_ttl; ttl++) {
         receive_t responses[config->num_send];
         memset(responses, 0, config->num_send * sizeof(receive_t));
+
+        if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+            eprintf("socket:");
+    
+        if (setsockopt(sockfd, SOL_IP, IP_RECVERR, &recverr, sizeof(recverr)) < 0)
+            eprintf("setsockopt:");
 
         for (i = 0; i < config->num_send; i++) {
             send_address.sin_port = htons(dest_port++);
@@ -108,8 +103,6 @@ void udp_main(config_t* config) {
 
         num_received = receive_icmps(
             sockfd,
-            dest_port - config->num_send,
-            dest_port,
             responses,
             config);
     }
