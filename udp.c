@@ -117,6 +117,14 @@ static unsigned int receive_icmps(
     return num_recv;
 }
 
+static int destination_reached(receive_t* responses, int num_send, int num_recv) {
+    if (num_recv < num_send)
+        return 0;
+    for (int i = 0; i < num_recv; i++)
+        if (responses[i].rec_icmp_type != ICMP_DEST_UNREACH)
+            return 0;
+    return 1;
+}
 
 void udp_main(config_t* config) {
     int sockfd, recverr = 1, ttl, i, num_received;
@@ -144,5 +152,8 @@ void udp_main(config_t* config) {
         num_received = receive_icmps(sockfd, responses, config);
 
         print_report(ttl, responses, config->num_send, num_received, config->use_dns);
+
+        if (destination_reached(responses, config->num_send, num_received))
+            break;
     }
 }
