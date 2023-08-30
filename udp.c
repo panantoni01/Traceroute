@@ -3,20 +3,25 @@
 #include<netinet/ip_icmp.h>
 #include<linux/errqueue.h>
 #include<assert.h>
+#include<errno.h>
 
 #include"udp.h"
 #include"common.h"
 #include"report.h"
 
 
-void send_udp_probe(int sockfd, struct sockaddr_in* address, int ttl) {
-    const char data[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+static void send_udp_probe(int sockfd, struct sockaddr_in* address) {
+    ssize_t ret = 0;
+    const char data[] = ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ123456";
 
-    if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
-        eprintf("setsockopt:");
+    /* Ugly hack to mitigate the ECONNREFUSED issue on localhost.
+    TODO - remove this hack and create separate socket for each udp packet sent */
+    do {
+        errno = 0;
+        ret = sendto(sockfd, data, strlen(data), 0, (struct sockaddr *) address, sizeof(*address));
+    } while (ret == -1 && errno == ECONNREFUSED);
 
-    if (sendto(sockfd, data, strlen(data), 0,
-        (struct sockaddr *) address, sizeof(*address)) < 0)
+    if (ret == -1)
         eprintf("sendto:");
 }
 
@@ -140,10 +145,12 @@ void udp_main(config_t* config) {
     
         if (setsockopt(sockfd, SOL_IP, IP_RECVERR, &recverr, sizeof(recverr)) < 0)
             eprintf("setsockopt:");
+        if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
+            eprintf("setsockopt:");
 
         for (i = 0; i < config->num_send; i++) {
             send_address.sin_port = htons(dest_port++);
-            send_udp_probe(sockfd, &send_address, ttl);
+            send_udp_probe(sockfd, &send_address);
 
             if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
                 eprintf("gettimeofday:");
