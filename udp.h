@@ -3,6 +3,6 @@
 
 #include "common.h"
 
-void udp_main(config_t* config);
+void udp_main(config_t *config);
 
 #endif /* !UDP_H */
