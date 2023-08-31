@@ -3,6 +3,6 @@
 
 #include "common.h"
 
-void icmp_main(config_t* config);
+void icmp_main(config_t *config);
 
 #endif /* !ICMP_H */

@@ -20,35 +20,33 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
 THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE. 
+DEALINGS IN THE SOFTWARE.
 
 */
 
 /* suckless sbase repo: https://git.suckless.org/sbase/ */
 
-#include<stdarg.h>
-#include<stdio.h> 
-#include<stdlib.h>
-#include<string.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 
-static void xvprintf(const char *fmt, va_list ap)
-{
-	vfprintf(stderr, fmt, ap);
+static void xvprintf(const char *fmt, va_list ap) {
+    vfprintf(stderr, fmt, ap);
 
-	if (fmt[0] && fmt[strlen(fmt)-1] == ':') {
-		fputc(' ', stderr);
-		perror(NULL);
-	}
+    if (fmt[0] && fmt[strlen(fmt) - 1] == ':') {
+        fputc(' ', stderr);
+        perror(NULL);
+    }
 }
 
-void eprintf(const char *fmt, ...)
-{
-	va_list ap;
+void eprintf(const char *fmt, ...) {
+    va_list ap;
 
-	va_start(ap, fmt);
-	xvprintf(fmt, ap);
-	va_end(ap);
+    va_start(ap, fmt);
+    xvprintf(fmt, ap);
+    va_end(ap);
 
-	exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 }
