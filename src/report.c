@@ -9,6 +9,8 @@
 #include "common.h"
 
 
+extern config_t config;
+
 static char *reverse_dns_lookup(struct in_addr *ip_addr, char hostname[NI_MAXHOST]) {
     struct sockaddr_in address = {.sin_addr = *ip_addr, .sin_family = AF_INET};
 
@@ -18,7 +20,7 @@ static char *reverse_dns_lookup(struct in_addr *ip_addr, char hostname[NI_MAXHOS
     return hostname;
 }
 
-static void print_ip_addrs(receive_t *responses, int num_recv, int use_dns) {
+static void print_ip_addrs(receive_t *responses, int num_recv) {
     int i, j, num_addrs = 0;
     struct in_addr distinct_addrs[num_recv];
     char ip_addr_buf[INET_ADDRSTRLEN];
@@ -36,7 +38,7 @@ static void print_ip_addrs(receive_t *responses, int num_recv, int use_dns) {
         memset(ip_addr_buf, 0, sizeof(ip_addr_buf));
         if (!inet_ntop(AF_INET, &(distinct_addrs[i]), ip_addr_buf, INET_ADDRSTRLEN))
             eprintf("inet_ntop:");
-        if (!use_dns)
+        if (!config.use_dns)
             printf(" %s", ip_addr_buf);
         else if (reverse_dns_lookup(&(distinct_addrs[i]), hostname))
             printf(" %s (%s)", hostname, ip_addr_buf);
@@ -57,7 +59,7 @@ static void print_avg_time(receive_t *responses, int num_recv) {
     printf("%.3fms", (double)elapsed_us / 1000 / num_recv);
 }
 
-void print_report(int ttl, receive_t *responses, int num_send, int num_recv, int use_dns) {
+void print_report(int ttl, receive_t *responses, int num_recv) {
     if (num_recv == 0) {
         printf("%d. *\n", ttl);
         return;
@@ -65,11 +67,11 @@ void print_report(int ttl, receive_t *responses, int num_send, int num_recv, int
 
     printf("%d.", ttl);
 
-    print_ip_addrs(responses, num_recv, use_dns);
+    print_ip_addrs(responses, num_recv);
 
     printf("  ");
 
-    if (num_send < num_recv)
+    if (config.num_send < num_recv)
         printf("???");
     else
         print_avg_time(responses, num_recv);
