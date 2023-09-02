@@ -119,6 +119,9 @@ static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t 
         }
     } while (num_recv < config->num_send);
 
+    for (int i = 0; i < config->num_send; i++)
+        close(sockfds[i]);
+
     return num_recv;
 }
 
