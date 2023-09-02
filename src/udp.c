@@ -11,6 +11,8 @@
 #include "report.h"
 
 
+extern config_t config;
+
 static void send_udp_probe(int sockfd, struct sockaddr_in *address) {
     const char data[] = ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ123456";
 
@@ -67,12 +69,12 @@ static void gather_response_data(struct cmsghdr *cmsg, receive_t *response) {
 probes. Store statistics in `responses`.
 
 Return number of received icmp packages */
-static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t *config) {
+static unsigned int receive_icmps(int sockfds[], receive_t *responses) {
 
     ssize_t _ret;
     int num_recv = 0, max_sockfd = 0;
     fd_set descriptors;
-    struct timeval timeout = config->wait_time;
+    struct timeval timeout = config.wait_time;
 
     struct msghdr msg;
     struct cmsghdr *cmsg;
@@ -91,13 +93,13 @@ static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t 
     iov.iov_len = sizeof(iov_base);
 
     /* Find maximum sockfd as 1st argument to `select()` call */
-    for (int i = 0; i < config->num_send; i++)
+    for (int i = 0; i < config.num_send; i++)
         if (sockfds[i] > max_sockfd)
             max_sockfd = sockfds[i];
 
     do {
         FD_ZERO(&descriptors);
-        for (int i = 0; i < config->num_send; i++)
+        for (int i = 0; i < config.num_send; i++)
             FD_SET(sockfds[i], &descriptors);
 
         _ret = select(max_sockfd + 1, &descriptors, NULL, NULL, &timeout);
@@ -106,7 +108,7 @@ static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t 
         else if (_ret == 0)
             break;
 
-        for (int i = 0; i < config->num_send; i++) {
+        for (int i = 0; i < config.num_send; i++) {
             if (!FD_ISSET(sockfds[i], &descriptors))
                 continue;
 
@@ -117,16 +119,16 @@ static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t 
                 if (verify_icmp(cmsg))
                     gather_response_data(cmsg, &responses[num_recv++]);
         }
-    } while (num_recv < config->num_send);
+    } while (num_recv < config.num_send);
 
-    for (int i = 0; i < config->num_send; i++)
+    for (int i = 0; i < config.num_send; i++)
         close(sockfds[i]);
 
     return num_recv;
 }
 
-static int destination_reached(receive_t *responses, int num_send, int num_recv) {
-    if (num_recv < num_send)
+static int destination_reached(receive_t *responses, int num_recv) {
+    if (num_recv < config.num_send)
         return 0;
     for (int i = 0; i < num_recv; i++)
         if (responses[i].rec_icmp_type != ICMP_DEST_UNREACH)
@@ -134,17 +136,17 @@ static int destination_reached(receive_t *responses, int num_send, int num_recv)
     return 1;
 }
 
-void udp_main(config_t *config) {
-    int sockfds[config->num_send];
+void udp_main() {
+    int sockfds[config.num_send];
     int recverr = 1, ttl, i, num_received;
-    struct sockaddr_in send_address = config->address;
-    uint16_t dest_port = config->dest_port;
+    struct sockaddr_in send_address = config.address;
+    uint16_t dest_port = config.dest_port;
 
-    for (ttl = config->first_ttl; ttl <= config->max_ttl; ttl++) {
-        receive_t responses[config->num_send];
-        memset(responses, 0, config->num_send * sizeof(receive_t));
+    for (ttl = config.first_ttl; ttl <= config.max_ttl; ttl++) {
+        receive_t responses[config.num_send];
+        memset(responses, 0, config.num_send * sizeof(receive_t));
 
-        for (i = 0; i < config->num_send; i++) {
+        for (i = 0; i < config.num_send; i++) {
             if ((sockfds[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
                 eprintf("socket:");
 
@@ -160,11 +162,11 @@ void udp_main(config_t *config) {
                 eprintf("gettimeofday:");
         }
 
-        num_received = receive_icmps(sockfds, responses, config);
+        num_received = receive_icmps(sockfds, responses);
 
-        print_report(ttl, responses, config->num_send, num_received, config->use_dns);
+        print_report(ttl, responses, num_received);
 
-        if (destination_reached(responses, config->num_send, num_received))
+        if (destination_reached(responses, num_received))
             break;
     }
 }

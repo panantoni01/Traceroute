@@ -1,8 +1,6 @@
 #ifndef ICMP_H
 #define ICMP_H
 
-#include "common.h"
-
-void icmp_main(config_t *config);
+void icmp_main();
 
 #endif /* !ICMP_H */

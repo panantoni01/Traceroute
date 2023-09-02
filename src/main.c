@@ -13,17 +13,17 @@
 #include "udp.h"
 #include "common.h"
 
+config_t config = {.wait_time = {.tv_sec = 1, .tv_usec = 0},
+                   .first_ttl = 1,
+                   .max_ttl = 30,
+                   .num_send = 3,
+                   .use_dns = 1,
+                   .mode = MODE_ICMP,
+                   .dest_port = 33434};
 
 int main(int argc, char *argv[]) {
     ssize_t ret;
     int opt;
-    config_t config = {.wait_time = {.tv_sec = 1, .tv_usec = 0},
-                       .first_ttl = 1,
-                       .max_ttl = 30,
-                       .num_send = 3,
-                       .use_dns = 1,
-                       .mode = MODE_ICMP,
-                       .dest_port = 33434};
 
     while ((opt = getopt(argc, argv, "IUnf:m:q:w:s:")) != -1) {
         switch (opt) {
@@ -79,9 +79,9 @@ int main(int argc, char *argv[]) {
         eprintf("inet_pton:");
 
     if (config.mode == MODE_ICMP)
-        icmp_main(&config);
+        icmp_main();
     else if (config.mode == MODE_UDP)
-        udp_main(&config);
+        udp_main();
     else {
         fprintf(stderr, "Unknown traceroute mode: %u\n", config.mode);
         exit(EXIT_FAILURE);

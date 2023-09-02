@@ -2,8 +2,9 @@
 #define REPORT_H
 
 #include "icmp.h"
+#include "common.h"
 
 
-void print_report(int ttl, receive_t *responses, int num_send, int num_recv, int use_dns);
+void print_report(int ttl, receive_t *responses, int num_recv);
 
 #endif /* !REPORT_H */
