@@ -4,6 +4,7 @@
 #include <linux/errqueue.h>
 #include <assert.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "udp.h"
 #include "common.h"
@@ -11,17 +12,9 @@
 
 
 static void send_udp_probe(int sockfd, struct sockaddr_in *address) {
-    ssize_t ret = 0;
     const char data[] = ";<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ123456";
 
-    /* Ugly hack to mitigate the ECONNREFUSED issue on localhost.
-    TODO - remove this hack and create separate socket for each udp packet sent */
-    do {
-        errno = 0;
-        ret = sendto(sockfd, data, strlen(data), 0, (struct sockaddr *)address, sizeof(*address));
-    } while (ret == -1 && errno == ECONNREFUSED);
-
-    if (ret == -1)
+    if (sendto(sockfd, data, strlen(data), 0, (struct sockaddr *)address, sizeof(*address)) < 0)
         eprintf("sendto:");
 }
 
@@ -46,7 +39,7 @@ static unsigned int verify_icmp(struct cmsghdr *cmsg) {
             return 1;
         else
             fprintf(stderr,
-                    "Received ICMP_DEST_UNREACH"
+                    "Received ICMP_DEST_UNREACH "
                     "error with code: %d\n",
                     (int)sock_err->ee_code);
     }
@@ -70,14 +63,14 @@ static void gather_response_data(struct cmsghdr *cmsg, receive_t *response) {
     response->rec_icmp_type = sock_err->ee_type;
 }
 
-/* Receive icmps from `sockfd` that correspond to some previously sent UDP
+/* Receive icmps from `sockfds` that correspond to some previously sent UDP
 probes. Store statistics in `responses`.
 
 Return number of received icmp packages */
-static unsigned int receive_icmps(int sockfd, receive_t *responses, config_t *config) {
+static unsigned int receive_icmps(int sockfds[], receive_t *responses, config_t *config) {
 
     ssize_t _ret;
-    int num_recv = 0;
+    int num_recv = 0, max_sockfd = 0;
     fd_set descriptors;
     struct timeval timeout = config->wait_time;
 
@@ -97,22 +90,33 @@ static unsigned int receive_icmps(int sockfd, receive_t *responses, config_t *co
     iov.iov_base = &iov_base;
     iov.iov_len = sizeof(iov_base);
 
+    /* Find maximum sockfd as 1st argument to `select()` call */
+    for (int i = 0; i < config->num_send; i++)
+        if (sockfds[i] > max_sockfd)
+            max_sockfd = sockfds[i];
+
     do {
         FD_ZERO(&descriptors);
-        FD_SET(sockfd, &descriptors);
+        for (int i = 0; i < config->num_send; i++)
+            FD_SET(sockfds[i], &descriptors);
 
-        _ret = select(sockfd + 1, &descriptors, NULL, NULL, &timeout);
+        _ret = select(max_sockfd + 1, &descriptors, NULL, NULL, &timeout);
         if (_ret < 0)
             eprintf("select:");
         else if (_ret == 0)
             break;
 
-        if (recvmsg(sockfd, &msg, MSG_ERRQUEUE) < 0)
-            eprintf("recvmsg:");
+        for (int i = 0; i < config->num_send; i++) {
+            if (!FD_ISSET(sockfds[i], &descriptors))
+                continue;
 
-        for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
-            if (verify_icmp(cmsg))
-                gather_response_data(cmsg, &responses[num_recv++]);
+            if (recvmsg(sockfds[i], &msg, MSG_ERRQUEUE) < 0)
+                eprintf("recvmsg:");
+
+            for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL; cmsg = CMSG_NXTHDR(&msg, cmsg))
+                if (verify_icmp(cmsg))
+                    gather_response_data(cmsg, &responses[num_recv++]);
+        }
     } while (num_recv < config->num_send);
 
     return num_recv;
@@ -128,7 +132,8 @@ static int destination_reached(receive_t *responses, int num_send, int num_recv)
 }
 
 void udp_main(config_t *config) {
-    int sockfd, recverr = 1, ttl, i, num_received;
+    int sockfds[config->num_send];
+    int recverr = 1, ttl, i, num_received;
     struct sockaddr_in send_address = config->address;
     uint16_t dest_port = config->dest_port;
 
@@ -136,23 +141,23 @@ void udp_main(config_t *config) {
         receive_t responses[config->num_send];
         memset(responses, 0, config->num_send * sizeof(receive_t));
 
-        if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-            eprintf("socket:");
-
-        if (setsockopt(sockfd, SOL_IP, IP_RECVERR, &recverr, sizeof(recverr)) < 0)
-            eprintf("setsockopt:");
-        if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
-            eprintf("setsockopt:");
-
         for (i = 0; i < config->num_send; i++) {
+            if ((sockfds[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+                eprintf("socket:");
+
+            if (setsockopt(sockfds[i], SOL_IP, IP_RECVERR, &recverr, sizeof(recverr)) < 0)
+                eprintf("setsockopt:");
+            if (setsockopt(sockfds[i], IPPROTO_IP, IP_TTL, &ttl, sizeof(int)) < 0)
+                eprintf("setsockopt:");
+
             send_address.sin_port = htons(dest_port++);
-            send_udp_probe(sockfd, &send_address);
+            send_udp_probe(sockfds[i], &send_address);
 
             if (gettimeofday(&responses[i].rec_send_time, NULL) < 0)
                 eprintf("gettimeofday:");
         }
 
-        num_received = receive_icmps(sockfd, responses, config);
+        num_received = receive_icmps(sockfds, responses, config);
 
         print_report(ttl, responses, config->num_send, num_received, config->use_dns);
 
