@@ -2,6 +2,7 @@ PROGRAM = traceroute
 SOURCES = main.c icmp.c report.c udp.c common.c
 SRCDIR = src
 BUILDDIR = build
+BINDIR = /usr/local/bin
 OBJECTS = $(SOURCES:%.c=$(BUILDDIR)/%.o)
 DEPENDENCY-FILES = $(SOURCES:%.c=$(BUILDDIR)/%.d)
 CFLAGS = -std=c17 -Wall -Wextra
@@ -27,10 +28,20 @@ $(BUILDDIR)/%.d: $(SRCDIR)/%.c
 	mkdir -p $(dir $@)
 	$(CC) -MT $(dir $@)$*.o -MM $< -MF $@
 
+install: $(PROGRAM)
+	@echo "[INSTALL] $< -> $(BINDIR)"
+	install -m 755 $(PROGRAM) $(BINDIR)
+
+uninstall:
+	@echo "Removed: $(BINDIR)/$(PROGRAM)"
+	rm -f $(BINDIR)/$(PROGRAM)
+
 clean:
-	rm -rf build
+	@echo "Removed: $(BUILDDIR)"
+	rm -rf $(BUILDDIR)
 
 distclean: clean
+	@echo "Removed: $(PROGRAM)"
 	rm -f $(PROGRAM)
 
 .PHONY: clean distclean
