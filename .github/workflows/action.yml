@@ -44,4 +44,4 @@ jobs:
           name: traceroute
       - run: |
           chmod +x traceroute
-          sudo ./traceroute -${{ matrix.type }} 127.0.0.1
+          sudo ./traceroute -${{ matrix.type }} localhost
