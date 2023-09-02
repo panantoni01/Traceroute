@@ -159,4 +159,6 @@ void icmp_main(config_t *config) {
         if (destination_reached(responses, config->num_send, num_recv))
             break;
     }
+
+    close(sockfd);
 }
