@@ -8,14 +8,27 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
+#include <netdb.h>
 
 #include "icmp.h"
 #include "udp.h"
 #include "common.h"
 
 
+static void hostname_to_address(const char *hostname, struct in_addr *address) {
+    struct addrinfo hint;
+    struct addrinfo *result;
+
+    memset(&hint, 0, sizeof(hint));
+    hint.ai_family = AF_INET;
+
+    if (getaddrinfo(hostname, NULL, &hint, &result) != 0)
+        eprintf("getaddrinfo:");
+    *address = ((struct sockaddr_in *)result->ai_addr)->sin_addr;
+    freeaddrinfo(result);
+}
+
 int main(int argc, char *argv[]) {
-    ssize_t ret;
     int opt;
     config_t config = {.wait_time = {.tv_sec = 1, .tv_usec = 0},
                        .first_ttl = 1,
@@ -71,12 +84,7 @@ int main(int argc, char *argv[]) {
 
     memset(&config.address, 0, sizeof(config.address));
     config.address.sin_family = AF_INET;
-    ret = inet_pton(AF_INET, argv[optind], &config.address.sin_addr);
-    if (ret == 0) {
-        fprintf(stderr, "ERROR: invalid ip address!\n");
-        exit(EXIT_FAILURE);
-    } else if (ret < 0)
-        eprintf("inet_pton:");
+    hostname_to_address(argv[optind], &config.address.sin_addr);
 
     if (config.mode == MODE_ICMP)
         icmp_main(&config);
